@@ -396,7 +396,7 @@ python -m pytest tests/test_csv_parser.py -v
 
 ## Phase 3: TMDB API + Matcher
 
-### - [ ] Task 3.1 — Create ingestion/tmdb_api.py (shared TMDB helper)
+### - [x] Task 3.1 — Create ingestion/tmdb_api.py (shared TMDB helper)
 
 **Files:** `ingestion/tmdb_api.py`
 
