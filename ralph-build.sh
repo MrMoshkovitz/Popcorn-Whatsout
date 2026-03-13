@@ -421,7 +421,7 @@ main() {
             # Run tests if they exist
             if [[ -d "tests" ]] && ls tests/test_*.py &>/dev/null; then
                 log_info "Running test suite..."
-                python -m pytest tests/ -v 2>&1 | tee -a "$LOG_FILE" || true
+                py -m pytest tests/ -v 2>&1 | tee -a "$LOG_FILE" || true
             fi
 
             save_state "$iteration" "complete"
