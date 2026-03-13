@@ -798,7 +798,7 @@ python -c "content = open('dashboard/templates/coming_soon.html', encoding='utf-
 
 ---
 
-### - [ ] Task 5.4 — Create library.html template
+### - [x] Task 5.4 — Create library.html template
 
 **Files:** `dashboard/templates/library.html`
 

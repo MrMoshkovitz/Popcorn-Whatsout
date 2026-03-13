@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% set active_tab = "library" %}
+
+{% block title %}Library{% endblock %}
+
+{% block content %}
+<h2 dir="auto">Library</h2>
+
+{% if titles %}
+<table role="grid">
+    <thead>
+        <tr>
+            <th dir="auto"></th>
+            <th dir="auto">Title</th>
+            <th dir="auto">Type</th>
+            <th dir="auto">Watched</th>
+            <th dir="auto">Last Watched</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for title in titles %}
+        <tr>
+            <td>
+                {% if title.poster_path %}
+                <img src="https://image.tmdb.org/t/p/w200{{ title.poster_path }}"
+                     alt="{{ title.title_he or title.title_en }}" dir="auto"
+                     style="max-width: 60px;">
+                {% endif %}
+            </td>
+            <td dir="auto">{{ title.title_he or title.title_en }}</td>
+            <td dir="auto"><small dir="auto">{{ title.tmdb_type }}</small></td>
+            <td dir="auto">{{ title.watch_count }}</td>
+            <td dir="auto">{{ title.last_watched }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p dir="auto">Your library is empty. Upload your Netflix viewing history to get started!</p>
+{% endif %}
+
+<hr>
+
+<h3 dir="auto">Add a Title</h3>
+<form method="post" action="/add">
+    <fieldset role="group">
+        <input type="text" name="query" class="autocomplete-input"
+               placeholder="Search for a movie or TV show..." dir="auto"
+               autocomplete="off" minlength="3">
+        <input type="hidden" name="tmdb_id" value="">
+        <input type="hidden" name="tmdb_type" value="">
+        <button type="submit" dir="auto">Add</button>
+    </fieldset>
+    <div class="autocomplete-results" dir="auto"></div>
+</form>
+{% endblock %}
