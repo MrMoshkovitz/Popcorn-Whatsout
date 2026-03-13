@@ -1081,7 +1081,7 @@ python -c "import sys; sys.path.insert(0, '.'); from bot.telegram_notifier impor
 
 ---
 
-### - [ ] Task 6.2 — Write Telegram bot tests
+### - [x] Task 6.2 — Write Telegram bot tests
 
 **Files:** `tests/test_telegram.py`
 
