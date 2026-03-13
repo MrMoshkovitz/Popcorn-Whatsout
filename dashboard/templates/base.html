@@ -43,5 +43,59 @@
             This product uses the TMDB API but is not endorsed or certified by TMDB.
         </small>
     </footer>
+
+    <script>
+    (function() {
+        var inputs = document.querySelectorAll('.autocomplete-input');
+        inputs.forEach(function(input) {
+            var timer = null;
+            var dropdown = document.createElement('div');
+            dropdown.style.cssText = 'position:absolute;background:var(--pico-card-background-color,#fff);border:1px solid var(--pico-muted-border-color,#ccc);z-index:100;max-height:300px;overflow-y:auto;display:none;width:100%';
+            input.parentNode.style.position = 'relative';
+            input.parentNode.appendChild(dropdown);
+
+            input.addEventListener('input', function() {
+                clearTimeout(timer);
+                var q = input.value.trim();
+                if (q.length < 3) { dropdown.style.display = 'none'; return; }
+                timer = setTimeout(function() {
+                    fetch('/search?q=' + encodeURIComponent(q))
+                        .then(function(r) { return r.json(); })
+                        .then(function(items) {
+                            dropdown.innerHTML = '';
+                            if (!items.length) { dropdown.style.display = 'none'; return; }
+                            items.forEach(function(item) {
+                                var row = document.createElement('div');
+                                row.style.cssText = 'padding:0.5em;cursor:pointer;display:flex;align-items:center;gap:0.5em';
+                                var img = item.poster_path ? '<img src="https://image.tmdb.org/t/p/w200' + item.poster_path + '" alt="" style="height:40px;width:27px;object-fit:cover">' : '';
+                                var badge = item.media_type === 'tv' ? 'TV' : 'Movie';
+                                row.innerHTML = img + '<span dir="auto">' + item.title + ' (' + (item.year || '?') + ') <small>[' + badge + ']</small></span>';
+                                row.addEventListener('click', function() {
+                                    input.value = item.title;
+                                    var form = input.closest('form');
+                                    if (form) {
+                                        var idField = form.querySelector('[name="tmdb_id"]');
+                                        var typeField = form.querySelector('[name="tmdb_type"]');
+                                        if (idField) idField.value = item.tmdb_id;
+                                        if (typeField) typeField.value = item.media_type;
+                                    }
+                                    dropdown.style.display = 'none';
+                                });
+                                dropdown.appendChild(row);
+                            });
+                            dropdown.style.display = 'block';
+                        });
+                }, 300);
+            });
+
+            document.addEventListener('click', function(e) {
+                if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+                    dropdown.style.display = 'none';
+                }
+            });
+        });
+    })();
+    </script>
+    {% block scripts %}{% endblock %}
 </body>
 </html>

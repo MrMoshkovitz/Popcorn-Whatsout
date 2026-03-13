@@ -278,5 +278,42 @@ def add():
     return redirect(url_for('library'))
 
 
+@app.route('/resolve/<int:title_id>', methods=['POST'])
+def resolve(title_id):
+    new_tmdb_id = request.form.get('new_tmdb_id', type=int)
+    new_tmdb_type = request.form.get('new_tmdb_type', '')
+
+    conn = get_db()
+    try:
+        if new_tmdb_id and new_tmdb_type in ('movie', 'tv'):
+            conn.execute(
+                "UPDATE titles SET tmdb_id = ?, tmdb_type = ?, match_status = 'manual', confidence = 1.0 WHERE id = ?",
+                (new_tmdb_id, new_tmdb_type, title_id)
+            )
+        else:
+            conn.execute(
+                "UPDATE titles SET match_status = 'auto' WHERE id = ?",
+                (title_id,)
+            )
+        conn.commit()
+    finally:
+        conn.close()
+    return redirect(url_for('review'))
+
+
+@app.route('/dismiss/<int:rec_id>', methods=['POST'])
+def dismiss(rec_id):
+    conn = get_db()
+    try:
+        conn.execute(
+            "UPDATE recommendations SET status = 'dismissed' WHERE id = ?",
+            (rec_id,)
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return redirect(url_for('watch_next'))
+
+
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
