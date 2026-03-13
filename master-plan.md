@@ -1246,7 +1246,7 @@ python -c "content = open('guides/netflix_export_guide_he.md', encoding='utf-8')
 
 ## Phase 8: Integration Testing
 
-### - [ ] Task 8.1 — Write dashboard integration tests
+### - [x] Task 8.1 — Write dashboard integration tests
 
 **Files:** `tests/test_dashboard.py`
 
