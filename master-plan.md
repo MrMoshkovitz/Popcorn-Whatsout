@@ -18,7 +18,7 @@
 | 3 | TMDB API + Matcher | 3.1–3.3 | Complete |
 | 4 | Engines | 4.1–4.6 | Complete |
 | 5 | Dashboard | 5.1–5.10 | Complete |
-| 6 | Telegram Bot | 6.1–6.3 | Not started |
+| 6 | Telegram Bot | 6.1–6.3 | Complete |
 | 7 | Cron + Docs | 7.1–7.4 | Not started |
 | 8 | Integration Testing | 8.1–8.3 | Not started |
 | 9 | Documentation + Polish | 9.1–9.4 | Not started |
@@ -1104,7 +1104,7 @@ python -m pytest tests/test_telegram.py -v
 
 ---
 
-### - [ ] Task 6.3 — Verify bot module completeness
+### - [x] Task 6.3 — Verify bot module completeness
 
 **Files:** None (verification only, fix if needed)
 
