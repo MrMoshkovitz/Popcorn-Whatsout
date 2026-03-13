@@ -16,7 +16,7 @@
 | 1 | Database | 1.1–1.2 | Complete |
 | 2 | CSV Parser | 2.1–2.3 | Complete |
 | 3 | TMDB API + Matcher | 3.1–3.3 | Complete |
-| 4 | Engines | 4.1–4.6 | Not started |
+| 4 | Engines | 4.1–4.6 | Complete |
 | 5 | Dashboard | 5.1–5.10 | Not started |
 | 6 | Telegram Bot | 6.1–6.3 | Not started |
 | 7 | Cron + Docs | 7.1–7.4 | Not started |
@@ -701,7 +701,7 @@ python -m pytest tests/test_new_season_checker.py -v
 
 ---
 
-### - [ ] Task 4.6 — Write availability tests
+### - [x] Task 4.6 — Write availability tests
 
 **Files:** `tests/test_availability.py`
 
