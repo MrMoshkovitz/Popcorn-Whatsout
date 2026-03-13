@@ -578,7 +578,7 @@ python -c "import sys; sys.path.insert(0, '.'); from engine.recommendations impo
 
 ---
 
-### - [ ] Task 4.2 — Implement engine/new_season_checker.py
+### - [x] Task 4.2 — Implement engine/new_season_checker.py
 
 **Files:** `engine/new_season_checker.py`
 
