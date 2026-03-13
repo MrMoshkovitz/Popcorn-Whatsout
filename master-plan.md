@@ -1373,7 +1373,7 @@ python -c "content = open('CHANGELOG.md', encoding='utf-8').read(); assert '0.1.
 
 ---
 
-### - [ ] Task 9.3 — Add logging configuration
+### - [x] Task 9.3 — Add logging configuration
 
 **Files:** `config.py` (modify)
 

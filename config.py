@@ -31,3 +31,17 @@ TELEGRAM_ADMIN_CHAT_ID = os.getenv('TELEGRAM_ADMIN_CHAT_ID', '')
 
 # Disambiguation
 DISAMBIGUATION_TIMEOUT_HOURS = 48
+
+# Logging
+import logging
+
+LOG_DIR = os.path.join(BASE_DIR, 'logs')
+os.makedirs(LOG_DIR, exist_ok=True)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(name)s] %(levelname)s: %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+    ]
+)
