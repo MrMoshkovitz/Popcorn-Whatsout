@@ -1196,7 +1196,7 @@ python -m pytest tests/test_daily_check.py -v
 
 ---
 
-### - [ ] Task 7.3 — Create Netflix export guide (English)
+### - [x] Task 7.3 — Create Netflix export guide (English)
 
 **Files:** `guides/netflix_export_guide_en.md`
 
