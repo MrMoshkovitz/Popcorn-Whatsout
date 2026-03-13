@@ -12,7 +12,7 @@
 
 | Phase | Name | Tasks | Status |
 |-------|------|-------|--------|
-| 0 | Infrastructure | 0.1–0.4 | Not started |
+| 0 | Infrastructure | 0.1–0.4 | Complete |
 | 1 | Database | 1.1–1.2 | Not started |
 | 2 | CSV Parser | 2.1–2.3 | Not started |
 | 3 | TMDB API + Matcher | 3.1–3.3 | Not started |
@@ -180,7 +180,7 @@ python -c "import config; assert config.TMDB_BASE_URL == 'https://api.themoviedb
 
 ---
 
-### - [ ] Task 0.4 — Create directory structure and __init__.py files
+### - [x] Task 0.4 — Create directory structure and __init__.py files
 
 **Files:** `db/.gitkeep`, `ingestion/__init__.py`, `engine/__init__.py`, `dashboard/__init__.py`, `dashboard/templates/.gitkeep`, `dashboard/static/.gitkeep`, `bot/__init__.py`, `cron/__init__.py`, `tests/__init__.py`, `tests/fixtures/.gitkeep`, `logs/.gitkeep`, `guides/.gitkeep`
 
