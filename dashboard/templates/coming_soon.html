@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% set active_tab = "coming-soon" %}
+
+{% block title %}Coming Soon{% endblock %}
+
+{% block content %}
+<h2 dir="auto">Coming Soon</h2>
+
+{% if alerts %}
+<div class="grid">
+    {% for alert in alerts %}
+    <article>
+        {% if alert.poster_path %}
+        <img src="https://image.tmdb.org/t/p/w200{{ alert.poster_path }}"
+             alt="{{ alert.title }}" dir="auto"
+             style="max-width: 200px;">
+        {% endif %}
+        <header>
+            <h3 dir="auto">{{ alert.title }}</h3>
+            <p dir="auto"><mark dir="auto">Season {{ alert.season_number }} now available!</mark></p>
+        </header>
+        {% if alert.providers %}
+        <p dir="auto">
+            {% for provider in alert.providers %}
+            <img src="https://image.tmdb.org/t/p/original{{ provider.provider_logo_path }}"
+                 alt="{{ provider.provider_name }}" dir="auto"
+                 title="{{ provider.provider_name }} ({{ provider.monetization_type }})"
+                 style="height: 24px; vertical-align: middle; margin-right: 4px;">
+            {% endfor %}
+        </p>
+        {% endif %}
+    </article>
+    {% endfor %}
+</div>
+{% else %}
+<p dir="auto">All caught up! No new seasons detected.</p>
+{% endif %}
+{% endblock %}

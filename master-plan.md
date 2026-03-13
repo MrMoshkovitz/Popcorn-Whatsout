@@ -775,7 +775,7 @@ python -c "content = open('dashboard/templates/watch_next.html', encoding='utf-8
 
 ---
 
-### - [ ] Task 5.3 — Create coming_soon.html template
+### - [x] Task 5.3 — Create coming_soon.html template
 
 **Files:** `dashboard/templates/coming_soon.html`
 
