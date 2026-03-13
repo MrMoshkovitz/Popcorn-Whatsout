@@ -19,7 +19,7 @@
 | 4 | Engines | 4.1–4.6 | Complete |
 | 5 | Dashboard | 5.1–5.10 | Complete |
 | 6 | Telegram Bot | 6.1–6.3 | Complete |
-| 7 | Cron + Docs | 7.1–7.4 | Not started |
+| 7 | Cron + Docs | 7.1–7.4 | Complete |
 | 8 | Integration Testing | 8.1–8.3 | Not started |
 | 9 | Documentation + Polish | 9.1–9.4 | Not started |
 | 10 | Definition of Done | 10.1–10.3 | Not started |
@@ -1228,7 +1228,7 @@ python -c "content = open('guides/netflix_export_guide_en.md', encoding='utf-8')
 
 ---
 
-### - [ ] Task 7.4 — Create Netflix export guide (Hebrew)
+### - [x] Task 7.4 — Create Netflix export guide (Hebrew)
 
 **Files:** `guides/netflix_export_guide_he.md`
 
