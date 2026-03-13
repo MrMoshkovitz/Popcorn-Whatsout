@@ -653,7 +653,7 @@ python -c "import sys; sys.path.insert(0, '.'); from engine.availability import 
 
 ---
 
-### - [ ] Task 4.4 — Write recommendation engine tests
+### - [x] Task 4.4 — Write recommendation engine tests
 
 **Files:** `tests/test_recommendations.py`
 
