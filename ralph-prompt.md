@@ -83,18 +83,22 @@ If all 3 attempts fail:
    - If 3 or more consecutive `[!]` tasks: add `## BUILD HALTED` section at the bottom of `master-plan.md` with error details, commit, and output `BUILD HALTED` then stop
    - Otherwise: stop (the next invocation will pick up the next `[ ]` task)
 
-### 4c. Mark Complete
+### 4c. Mark Complete — CRITICAL: Update master-plan.md
 
-1. In `master-plan.md`, change the task's `- [ ]` to `- [x]`
-2. Stage the implementation files AND `master-plan.md`:
+**You MUST update `master-plan.md` after every completed task. This is how the build loop tracks progress.**
+
+1. Open `master-plan.md` and find the exact `### - [ ] Task X.Y` heading you just completed
+2. Change `- [ ]` to `- [x]` on that line (do NOT change any other lines)
+3. Also update the Progress Tracker table at the top: if all tasks in a phase are `[x]`, change that phase's Status to `Complete`
+4. Stage the implementation files AND `master-plan.md` together:
    ```bash
    git add <files from task> master-plan.md
    ```
-3. Commit with the EXACT message from the **Commit:** field:
+5. Commit with the EXACT message from the **Commit:** field:
    ```bash
    git commit -m "<commit message from task>"
    ```
-4. Push:
+6. Push:
    ```bash
    git push
    ```

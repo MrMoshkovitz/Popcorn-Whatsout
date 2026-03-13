@@ -31,8 +31,13 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
+MAGENTA='\033[0;35m'
 BOLD='\033[1m'
+DIM='\033[2m'
 NC='\033[0m'
+
+BAR_WIDTH=30
+TASK_DURATIONS=()  # track per-task durations for ETA
 
 timestamp() {
     date '+%Y-%m-%d %H:%M:%S'
@@ -47,6 +52,106 @@ log_info()    { log "${BLUE}INFO${NC}  $1"; }
 log_success() { log "${GREEN}OK${NC}    $1"; }
 log_warn()    { log "${YELLOW}WARN${NC}  $1"; }
 log_error()   { log "${RED}ERROR${NC} $1"; }
+
+# ═══════════════════════════════════════════════════════════════
+# Progress Display
+# ═══════════════════════════════════════════════════════════════
+
+get_phase_name() {
+    local task_id="$1"
+    local phase_num="${task_id%%.*}"
+    case "$phase_num" in
+        0) echo "Infrastructure" ;;
+        1) echo "Database" ;;
+        2) echo "CSV Parser" ;;
+        3) echo "TMDB API + Matcher" ;;
+        4) echo "Engines" ;;
+        5) echo "Dashboard" ;;
+        6) echo "Telegram Bot" ;;
+        7) echo "Cron + Docs" ;;
+        8) echo "Integration Testing" ;;
+        9) echo "Documentation + Polish" ;;
+        10) echo "Definition of Done" ;;
+        *) echo "Unknown" ;;
+    esac
+}
+
+format_duration() {
+    local secs="$1"
+    if [[ $secs -ge 3600 ]]; then
+        printf "%dh %dm" $((secs / 3600)) $(( (secs % 3600) / 60 ))
+    elif [[ $secs -ge 60 ]]; then
+        printf "%dm %ds" $((secs / 60)) $((secs % 60))
+    else
+        printf "%ds" "$secs"
+    fi
+}
+
+calc_eta() {
+    local remaining="$1"
+    local count=${#TASK_DURATIONS[@]}
+
+    if [[ $count -eq 0 ]]; then
+        echo "calculating..."
+        return
+    fi
+
+    local sum=0
+    for d in "${TASK_DURATIONS[@]}"; do
+        sum=$((sum + d))
+    done
+    local avg=$((sum / count))
+    local eta_secs=$((avg * remaining))
+
+    format_duration "$eta_secs"
+}
+
+show_progress() {
+    local completed="$1"
+    local remaining="$2"
+    local failed="$3"
+    local total="$4"
+    local task_name="$5"
+    local elapsed="$6"
+
+    # Extract task ID (e.g., "Task 3.2" -> "3.2")
+    local task_id
+    task_id=$(echo "$task_name" | grep -oE '[0-9]+\.[0-9]+' | head -1)
+    local phase_name
+    phase_name=$(get_phase_name "$task_id")
+
+    # Calculate percentage
+    local pct=0
+    if [[ $total -gt 0 ]]; then
+        pct=$(( (completed * 100) / total ))
+    fi
+
+    # Build the bar: filled = green, empty = dim
+    local filled=$(( (completed * BAR_WIDTH) / total ))
+    local empty=$((BAR_WIDTH - filled))
+    local bar=""
+    for ((i = 0; i < filled; i++)); do bar+="█"; done
+    for ((i = 0; i < empty; i++)); do bar+="░"; done
+
+    local eta
+    eta=$(calc_eta "$remaining")
+    local elapsed_fmt
+    elapsed_fmt=$(format_duration "$elapsed")
+
+    echo ""
+    echo -e "  ${BOLD}${CYAN}═══════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo -e "  ${GREEN}${bar}${NC}  ${BOLD}${pct}%${NC}  (${completed}/${total})"
+    echo ""
+    echo -e "  ${BOLD}Current:${NC}  ${YELLOW}${task_name}${NC}"
+    echo -e "  ${BOLD}Phase:${NC}    ${MAGENTA}${phase_name}${NC} (Phase ${task_id%%.*})"
+    echo ""
+    echo -e "  ${GREEN}${completed} done${NC}  ${DIM}|${NC}  ${YELLOW}${remaining} left${NC}  ${DIM}|${NC}  ${RED}${failed} failed${NC}"
+    echo -e "  ${DIM}Elapsed: ${elapsed_fmt}  |  ETA: ~${eta}${NC}"
+    echo ""
+    echo -e "  ${BOLD}${CYAN}═══════════════════════════════════════════════════════${NC}"
+    echo ""
+}
 
 # ═══════════════════════════════════════════════════════════════
 # Startup Checks
@@ -290,20 +395,21 @@ main() {
 
         # All tasks done
         if [[ $remaining -eq 0 ]]; then
-            local build_end build_duration
+            local build_end build_duration total_fmt
             build_end=$(date +%s)
             build_duration=$((build_end - build_start))
-            local hours=$((build_duration / 3600))
-            local mins=$(( (build_duration % 3600) / 60 ))
+            total_fmt=$(format_duration "$build_duration")
 
-            echo ""
+            # Final full progress bar
+            show_progress "$completed" "0" "$failed" "$((completed + failed))" "ALL TASKS COMPLETE" "$build_duration"
+
             log_success "═══════════════════════════════════════════"
             log_success "BUILD COMPLETE"
             log_success "═══════════════════════════════════════════"
             log_success "Tasks completed: $completed"
             log_success "Tasks failed:    $failed"
             log_success "Iterations:      $((iteration - 1))"
-            log_success "Total time:      ${hours}h ${mins}m"
+            log_success "Total time:      $total_fmt"
             echo ""
 
             # Show recent commits
@@ -330,12 +436,15 @@ main() {
         fi
 
         # Get next task name for logging
-        local task_name
+        local task_name total
         task_name=$(get_next_task_name)
+        total=$(grep -c '### - \[' "$PLAN_FILE" 2>/dev/null || true)
 
-        log_info "───────────────────────────────────────────"
-        log_info "Iteration $iteration | $completed done | $remaining remaining | Next: $task_name"
-        log_info "───────────────────────────────────────────"
+        # Show progress bar
+        local elapsed_so_far=$(( $(date +%s) - build_start ))
+        show_progress "$completed" "$remaining" "$failed" "$total" "$task_name" "$elapsed_so_far"
+
+        log_info "Iteration $iteration | Next: $task_name"
 
         save_state "$iteration" "running"
 
@@ -355,9 +464,9 @@ main() {
         end_time=$(date +%s)
         duration=$((end_time - start_time))
 
-        local mins=$((duration / 60))
-        local secs=$((duration % 60))
-        log_info "CC finished in ${mins}m ${secs}s (exit code: $exit_code)"
+        local dur_fmt
+        dur_fmt=$(format_duration "$duration")
+        log_info "CC finished in ${dur_fmt} (exit code: $exit_code)"
 
         # Check for completion marker
         if echo "$output" | grep -qF "$COMPLETION_MARKER"; then
@@ -393,6 +502,9 @@ main() {
             log_warn "CC exited with code $exit_code (not rate limit). Waiting ${CRASH_WAIT_SECONDS}s before retry."
             sleep "$CRASH_WAIT_SECONDS"
             # Still increment — if CC crashed but may have committed work, next iteration re-checks
+        else
+            # Track successful task duration for ETA calculation
+            TASK_DURATIONS+=("$duration")
         fi
 
         iteration=$((iteration + 1))
