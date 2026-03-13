@@ -1010,7 +1010,7 @@ python -c "import sys, os; sys.path.insert(0, '.'); sys.path.insert(0, 'dashboar
 
 ## Phase 6: Telegram Bot
 
-### - [ ] Task 6.1 — Implement bot/telegram_notifier.py
+### - [x] Task 6.1 — Implement bot/telegram_notifier.py
 
 **Files:** `bot/telegram_notifier.py`
 
