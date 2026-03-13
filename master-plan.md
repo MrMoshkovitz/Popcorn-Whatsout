@@ -20,7 +20,7 @@
 | 5 | Dashboard | 5.1–5.10 | Complete |
 | 6 | Telegram Bot | 6.1–6.3 | Complete |
 | 7 | Cron + Docs | 7.1–7.4 | Complete |
-| 8 | Integration Testing | 8.1–8.3 | Not started |
+| 8 | Integration Testing | 8.1–8.3 | Complete |
 | 9 | Documentation + Polish | 9.1–9.4 | Not started |
 | 10 | Definition of Done | 10.1–10.3 | Not started |
 
@@ -1297,7 +1297,7 @@ python -m pytest tests/test_integration.py -v
 
 ---
 
-### - [ ] Task 8.3 — Run full test suite and fix failures
+### - [x] Task 8.3 — Run full test suite and fix failures
 
 **Files:** Any files needing fixes
 
