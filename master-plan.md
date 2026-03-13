@@ -821,7 +821,7 @@ python -c "content = open('dashboard/templates/library.html', encoding='utf-8').
 
 ---
 
-### - [ ] Task 5.5 — Create review.html template
+### - [x] Task 5.5 — Create review.html template
 
 **Files:** `dashboard/templates/review.html`
 
