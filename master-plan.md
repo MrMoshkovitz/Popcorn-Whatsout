@@ -462,7 +462,7 @@ python -c "import sys; sys.path.insert(0, '.'); from ingestion.tmdb_api import t
 
 ---
 
-### - [ ] Task 3.2 — Implement tmdb_matcher.py
+### - [x] Task 3.2 — Implement tmdb_matcher.py
 
 **Files:** `ingestion/tmdb_matcher.py`
 
