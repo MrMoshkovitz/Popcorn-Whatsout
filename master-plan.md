@@ -724,7 +724,7 @@ python -m pytest tests/test_availability.py -v
 
 ## Phase 5: Dashboard
 
-### - [ ] Task 5.1 — Create base.html template
+### - [x] Task 5.1 — Create base.html template
 
 **Files:** `dashboard/templates/base.html`
 
