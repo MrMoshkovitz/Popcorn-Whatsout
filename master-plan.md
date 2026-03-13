@@ -914,7 +914,7 @@ python -c "import sys, os; sys.path.insert(0, '.'); sys.path.insert(0, 'dashboar
 
 ---
 
-### - [ ] Task 5.8 — Add POST /upload route
+### - [x] Task 5.8 — Add POST /upload route
 
 **Files:** `dashboard/app.py` (modify)
 

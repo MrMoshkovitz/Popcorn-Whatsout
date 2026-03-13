@@ -2,11 +2,17 @@ import os
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from flask import Flask, render_template, redirect, url_for
+from flask import Flask, render_template, redirect, url_for, request, flash
 import sqlite3
+import tempfile
+import os as _os
+from datetime import datetime, timedelta
 from config import DB_PATH
+from ingestion.csv_parser import parse_netflix_csv
+from ingestion.tmdb_matcher import match_entries
 
 app = Flask(__name__)
+app.secret_key = _os.urandom(24)
 
 
 def get_db():
@@ -142,6 +148,60 @@ def review():
         return render_template('review.html',
                                review_items=review_items,
                                review_count=len(review_items))
+    finally:
+        conn.close()
+
+
+@app.route('/upload', methods=['POST'])
+def upload():
+    conn = get_db()
+    try:
+        # Check 24h rate limit
+        row = conn.execute(
+            "SELECT value FROM settings WHERE key = ?", ('last_upload_date',)
+        ).fetchone()
+        if row:
+            last_upload = datetime.fromisoformat(row['value'])
+            if datetime.now() - last_upload < timedelta(hours=24):
+                flash('Upload rate limited — please wait 24 hours between uploads.')
+                return redirect(url_for('library'))
+
+        # Validate file
+        if 'csv_file' not in request.files:
+            flash('No file selected.')
+            return redirect(url_for('library'))
+
+        file = request.files['csv_file']
+        if not file.filename or not file.filename.lower().endswith('.csv'):
+            flash('Please upload a .csv file.')
+            return redirect(url_for('library'))
+
+        # Save to temp file, parse, match
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.csv')
+        try:
+            file.save(tmp.name)
+            tmp.close()
+            entries = parse_netflix_csv(tmp.name)
+        finally:
+            _os.unlink(tmp.name)
+
+        if not entries:
+            flash('No valid entries found in CSV.')
+            return redirect(url_for('library'))
+
+        stats = match_entries(entries, conn)
+
+        # Update last upload timestamp
+        conn.execute(
+            "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+            ('last_upload_date', datetime.now().isoformat())
+        )
+        conn.commit()
+
+        flash(f"Upload complete: {stats.get('matched', 0)} matched, "
+              f"{stats.get('review', 0)} need review, "
+              f"{stats.get('errors', 0)} errors.")
+        return redirect(url_for('library'))
     finally:
         conn.close()
 
