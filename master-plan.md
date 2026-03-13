@@ -614,7 +614,7 @@ python -c "import sys; sys.path.insert(0, '.'); from engine.new_season_checker i
 
 ---
 
-### - [ ] Task 4.3 — Implement engine/availability.py
+### - [x] Task 4.3 — Implement engine/availability.py
 
 **Files:** `engine/availability.py`
 
