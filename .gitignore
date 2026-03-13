@@ -4,5 +4,6 @@ __pycache__/
 popcorn.db
 logs/*.log
 *.csv
+!tests/fixtures/*.csv
 venv/
 .venv/

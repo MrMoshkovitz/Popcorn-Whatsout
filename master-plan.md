@@ -268,7 +268,7 @@ python -c "import sys; sys.path.insert(0, '.'); from db.init_db import get_conne
 
 ## Phase 2: CSV Parser
 
-### - [ ] Task 2.1 — Create sample Netflix CSV fixture
+### - [x] Task 2.1 — Create sample Netflix CSV fixture
 
 **Files:** `tests/fixtures/sample_netflix.csv`
 
