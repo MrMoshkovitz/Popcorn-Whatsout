@@ -1127,7 +1127,7 @@ python -c "import sys; sys.path.insert(0, '.'); from bot.telegram_notifier impor
 
 ## Phase 7: Cron + Docs
 
-### - [ ] Task 7.1 — Implement cron/daily_check.py
+### - [x] Task 7.1 — Implement cron/daily_check.py
 
 **Files:** `cron/daily_check.py`
 
