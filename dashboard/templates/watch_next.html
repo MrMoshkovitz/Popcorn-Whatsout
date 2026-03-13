@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% set active_tab = "watch-next" %}
+
+{% block title %}Watch Next{% endblock %}
+
+{% block content %}
+<h2 dir="auto">Watch Next</h2>
+
+{% if recommendations %}
+<div class="grid">
+    {% for rec in recommendations %}
+    <article>
+        {% if rec.poster_path %}
+        <img src="https://image.tmdb.org/t/p/w200{{ rec.poster_path }}"
+             alt="{{ rec.recommended_title }}" dir="auto"
+             style="max-width: 200px;">
+        {% endif %}
+        <header>
+            <h3 dir="auto">{{ rec.recommended_title }}</h3>
+            <p dir="auto"><small dir="auto">Because you watched <strong dir="auto">{{ rec.source_title }}</strong></small></p>
+        </header>
+        {% if rec.providers %}
+        <p dir="auto">
+            {% for provider in rec.providers %}
+            <img src="https://image.tmdb.org/t/p/original{{ provider.provider_logo_path }}"
+                 alt="{{ provider.provider_name }}" dir="auto"
+                 title="{{ provider.provider_name }} ({{ provider.monetization_type }})"
+                 style="height: 24px; vertical-align: middle; margin-right: 4px;">
+            {% endfor %}
+        </p>
+        {% endif %}
+        <footer>
+            <form method="post" action="/dismiss/{{ rec.id }}">
+                <button type="submit" class="secondary outline" dir="auto">Dismiss</button>
+            </form>
+        </footer>
+    </article>
+    {% endfor %}
+</div>
+{% else %}
+<p dir="auto">No recommendations yet. Upload your Netflix history to get started!</p>
+{% endif %}
+{% endblock %}

@@ -752,7 +752,7 @@ python -c "content = open('dashboard/templates/base.html', encoding='utf-8').rea
 
 ---
 
-### - [ ] Task 5.2 — Create watch_next.html template
+### - [x] Task 5.2 — Create watch_next.html template
 
 **Files:** `dashboard/templates/watch_next.html`
 
