@@ -2,7 +2,7 @@ import os
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from flask import Flask, render_template, redirect, url_for, request, flash
+from flask import Flask, render_template, redirect, url_for, request, flash, jsonify
 import sqlite3
 import tempfile
 import os as _os
@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from config import DB_PATH
 from ingestion.csv_parser import parse_netflix_csv
 from ingestion.tmdb_matcher import match_entries
+from ingestion.tmdb_api import tmdb_get
 
 app = Flask(__name__)
 app.secret_key = _os.urandom(24)
@@ -204,6 +205,77 @@ def upload():
         return redirect(url_for('library'))
     finally:
         conn.close()
+
+
+@app.route('/search')
+def search():
+    q = request.args.get('q', '').strip()
+    if len(q) < 3:
+        return jsonify([])
+
+    results = tmdb_get('/search/multi', {'query': q, 'language': 'he-IL'})
+    if not results or not results.get('results'):
+        results = tmdb_get('/search/multi', {'query': q, 'language': 'en-US'})
+
+    items = []
+    for r in (results or {}).get('results', []):
+        if r.get('media_type') not in ('movie', 'tv'):
+            continue
+        title = r.get('name') or r.get('title', '')
+        year = (r.get('first_air_date') or r.get('release_date') or '')[:4]
+        items.append({
+            'tmdb_id': r['id'],
+            'media_type': r['media_type'],
+            'title': title,
+            'year': year,
+            'poster_path': r.get('poster_path'),
+        })
+        if len(items) >= 5:
+            break
+    return jsonify(items)
+
+
+@app.route('/add', methods=['POST'])
+def add():
+    tmdb_id = request.form.get('tmdb_id', type=int)
+    tmdb_type = request.form.get('tmdb_type', '')
+    if not tmdb_id or tmdb_type not in ('movie', 'tv'):
+        flash('Invalid title selection.')
+        return redirect(url_for('library'))
+
+    details_he = tmdb_get(f'/{tmdb_type}/{tmdb_id}', {'language': 'he-IL'})
+    details_en = tmdb_get(f'/{tmdb_type}/{tmdb_id}', {'language': 'en-US'})
+
+    conn = get_db()
+    try:
+        conn.execute("""
+            INSERT OR REPLACE INTO titles
+            (tmdb_id, tmdb_type, title_he, title_en, poster_path, match_status, confidence)
+            VALUES (?, ?, ?, ?, ?, 'manual', 1.0)
+        """, (
+            tmdb_id, tmdb_type,
+            (details_he or {}).get('title') or (details_he or {}).get('name'),
+            (details_en or {}).get('title') or (details_en or {}).get('name'),
+            (details_he or details_en or {}).get('poster_path'),
+        ))
+
+        if tmdb_type == 'tv':
+            title_id = conn.execute(
+                "SELECT id FROM titles WHERE tmdb_id = ? AND tmdb_type = ?",
+                (tmdb_id, tmdb_type)
+            ).fetchone()['id']
+            num_seasons = (details_en or details_he or {}).get('number_of_seasons', 1)
+            conn.execute("""
+                INSERT OR REPLACE INTO series_tracking
+                (title_id, max_watched_season, total_seasons_tmdb, status)
+                VALUES (?, ?, ?, 'watching')
+            """, (title_id, num_seasons, num_seasons))
+
+        conn.commit()
+        flash('Title added to library.')
+    finally:
+        conn.close()
+    return redirect(url_for('library'))
 
 
 if __name__ == '__main__':

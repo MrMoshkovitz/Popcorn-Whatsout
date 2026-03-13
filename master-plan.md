@@ -946,7 +946,7 @@ python -c "import sys, os; sys.path.insert(0, '.'); sys.path.insert(0, 'dashboar
 
 ---
 
-### - [ ] Task 5.9 — Add GET /search and POST /add routes
+### - [x] Task 5.9 — Add GET /search and POST /add routes
 
 **Files:** `dashboard/app.py` (modify)
 
