@@ -128,7 +128,7 @@ python -c "import os; assert os.path.isfile('.env.example'), '.env.example missi
 
 ---
 
-### - [ ] Task 0.3 — Create config.py
+### - [x] Task 0.3 — Create config.py
 
 **Files:** `config.py`
 
