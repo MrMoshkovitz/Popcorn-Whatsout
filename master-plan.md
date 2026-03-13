@@ -678,7 +678,7 @@ python -m pytest tests/test_recommendations.py -v
 
 ---
 
-### - [ ] Task 4.5 — Write new_season_checker tests
+### - [x] Task 4.5 — Write new_season_checker tests
 
 **Files:** `tests/test_new_season_checker.py`
 
