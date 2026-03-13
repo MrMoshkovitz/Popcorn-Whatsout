@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS titles (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY,
     tmdb_id INTEGER NOT NULL,
     tmdb_type TEXT NOT NULL CHECK(tmdb_type IN ('movie', 'tv')),
     title_en TEXT,
@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS titles (
 );
 
 CREATE TABLE IF NOT EXISTS watch_history (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY,
     title_id INTEGER REFERENCES titles(id),
     raw_csv_title TEXT,
     watch_date DATE NOT NULL,
@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS watch_history (
 );
 
 CREATE TABLE IF NOT EXISTS series_tracking (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY,
     title_id INTEGER REFERENCES titles(id),
     tmdb_id INTEGER NOT NULL,
     total_seasons_tmdb INTEGER,
@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS series_tracking (
 );
 
 CREATE TABLE IF NOT EXISTS recommendations (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY,
     source_title_id INTEGER REFERENCES titles(id),
     recommended_tmdb_id INTEGER NOT NULL,
     recommended_type TEXT NOT NULL,
@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS recommendations (
 );
 
 CREATE TABLE IF NOT EXISTS streaming_availability (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY,
     tmdb_id INTEGER NOT NULL,
     tmdb_type TEXT NOT NULL,
     provider_name TEXT NOT NULL,

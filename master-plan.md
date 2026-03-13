@@ -13,7 +13,7 @@
 | Phase | Name | Tasks | Status |
 |-------|------|-------|--------|
 | 0 | Infrastructure | 0.1–0.4 | Complete |
-| 1 | Database | 1.1–1.2 | Not started |
+| 1 | Database | 1.1–1.2 | Complete |
 | 2 | CSV Parser | 2.1–2.3 | Not started |
 | 3 | TMDB API + Matcher | 3.1–3.3 | Not started |
 | 4 | Engines | 4.1–4.6 | Not started |
@@ -218,7 +218,7 @@ python -c "import sqlite3; conn = sqlite3.connect(':memory:'); f = open('db/sche
 
 ---
 
-### - [ ] Task 1.2 — Create database initialization helper
+### - [x] Task 1.2 — Create database initialization helper
 
 **Files:** `db/__init__.py`, `db/init_db.py`
 
