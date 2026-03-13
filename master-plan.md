@@ -198,7 +198,7 @@ python -c "import os; dirs = ['db', 'ingestion', 'engine', 'dashboard', 'dashboa
 
 ## Phase 1: Database
 
-### - [ ] Task 1.1 — Create db/schema.sql
+### - [x] Task 1.1 — Create db/schema.sql
 
 **Files:** `db/schema.sql`
 
