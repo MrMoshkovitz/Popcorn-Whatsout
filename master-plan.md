@@ -1315,7 +1315,7 @@ python -m pytest tests/ -v --tb=short
 
 ## Phase 9: Documentation + Polish
 
-### - [ ] Task 9.1 — Create README.md
+### - [x] Task 9.1 — Create README.md
 
 **Files:** `README.md`
 
