@@ -1,0 +1,8 @@
+.env
+*.pyc
+__pycache__/
+popcorn.db
+logs/*.log
+*.csv
+venv/
+.venv/

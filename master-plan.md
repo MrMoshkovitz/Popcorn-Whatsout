@@ -94,7 +94,7 @@ python -c "lines = open('requirements.txt').read().strip().split('\n'); assert l
 
 ---
 
-### - [ ] Task 0.2 — Create .env.example and .gitignore
+### - [x] Task 0.2 — Create .env.example and .gitignore
 
 **Files:** `.env.example`, `.gitignore`
 
