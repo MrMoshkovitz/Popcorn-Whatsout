@@ -15,7 +15,7 @@
 | 0 | Infrastructure | 0.1–0.4 | Complete |
 | 1 | Database | 1.1–1.2 | Complete |
 | 2 | CSV Parser | 2.1–2.3 | Complete |
-| 3 | TMDB API + Matcher | 3.1–3.3 | Not started |
+| 3 | TMDB API + Matcher | 3.1–3.3 | Complete |
 | 4 | Engines | 4.1–4.6 | Not started |
 | 5 | Dashboard | 5.1–5.10 | Not started |
 | 6 | Telegram Bot | 6.1–6.3 | Not started |
@@ -508,7 +508,7 @@ python -c "import sys; sys.path.insert(0, '.'); from ingestion.tmdb_matcher impo
 
 ---
 
-### - [ ] Task 3.3 — Write TMDB matcher tests
+### - [x] Task 3.3 — Write TMDB matcher tests
 
 **Files:** `tests/test_tmdb_matcher.py`
 
