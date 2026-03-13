@@ -1,0 +1,4 @@
+flask>=3.0
+requests>=2.31
+python-telegram-bot>=20.0
+python-dateutil>=2.8
