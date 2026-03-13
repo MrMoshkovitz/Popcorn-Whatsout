@@ -845,7 +845,7 @@ python -c "content = open('dashboard/templates/review.html', encoding='utf-8').r
 
 ---
 
-### - [ ] Task 5.6 — Create dashboard/static/style.css
+### - [x] Task 5.6 — Create dashboard/static/style.css
 
 **Files:** `dashboard/static/style.css`
 

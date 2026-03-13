@@ -1,0 +1,133 @@
+/* Popcorn — Minimal custom styles (Pico CSS does the heavy lifting) */
+
+/* Card grid for recommendations and alerts */
+.grid article {
+    text-align: center;
+}
+
+.grid article img {
+    max-width: 200px;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 2 / 3;
+    object-fit: cover;
+    border-radius: 4px;
+}
+
+/* Library table poster sizing */
+table img {
+    max-width: 60px;
+    height: auto;
+    aspect-ratio: 2 / 3;
+    object-fit: cover;
+    border-radius: 2px;
+}
+
+/* Provider icon sizing */
+.grid article p img,
+article p img[title] {
+    height: 24px;
+    width: auto;
+    vertical-align: middle;
+    margin-right: 4px;
+    border-radius: 4px;
+}
+
+/* Type badge styling */
+td small {
+    background: var(--pico-secondary-background);
+    color: var(--pico-secondary-inverse);
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75em;
+    text-transform: uppercase;
+}
+
+/* Active tab indicator — Pico handles aria-current, reinforce it */
+nav a[aria-current="page"] {
+    font-weight: bold;
+    border-bottom: 2px solid var(--pico-primary);
+}
+
+/* Dismiss button — keep it compact */
+article footer form {
+    margin: 0;
+}
+
+article footer button {
+    padding: 4px 12px;
+    font-size: 0.85em;
+}
+
+/* Autocomplete dropdown */
+.autocomplete-results {
+    position: relative;
+}
+
+.autocomplete-results ul {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background: var(--pico-card-background-color);
+    border: 1px solid var(--pico-muted-border-color);
+    border-radius: 4px;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.autocomplete-results li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--pico-muted-border-color);
+}
+
+.autocomplete-results li:last-child {
+    border-bottom: none;
+}
+
+.autocomplete-results li:hover {
+    background: var(--pico-primary-focus);
+}
+
+.autocomplete-results li img {
+    width: 40px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+.autocomplete-results li span {
+    display: block;
+}
+
+/* Confidence percentage styling on review page */
+article header small {
+    color: var(--pico-del-color);
+}
+
+/* Review page grid layout */
+article .grid > div {
+    text-align: center;
+}
+
+/* Footer TMDB attribution */
+footer small img {
+    height: 1em;
+    vertical-align: middle;
+}
+
+/* Responsive: stack cards on small screens */
+@media (max-width: 576px) {
+    .grid article img {
+        max-width: 150px;
+    }
+}
