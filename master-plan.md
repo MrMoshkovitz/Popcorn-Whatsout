@@ -1272,7 +1272,7 @@ python -m pytest tests/test_dashboard.py -v
 
 ---
 
-### - [ ] Task 8.2 — Write end-to-end CSV import test
+### - [x] Task 8.2 — Write end-to-end CSV import test
 
 **Files:** `tests/test_integration.py`
 
