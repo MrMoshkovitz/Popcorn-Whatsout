@@ -871,7 +871,7 @@ python -c "content = open('dashboard/static/style.css').read(); assert len(conte
 
 ---
 
-### - [ ] Task 5.7 — Implement dashboard/app.py (GET routes)
+### - [x] Task 5.7 — Implement dashboard/app.py (GET routes)
 
 **Files:** `dashboard/app.py`
 
