@@ -298,7 +298,7 @@ python -c "import csv; f = open('tests/fixtures/sample_netflix.csv', encoding='u
 
 ---
 
-### - [ ] Task 2.2 — Implement csv_parser.py
+### - [x] Task 2.2 — Implement csv_parser.py
 
 **Files:** `ingestion/csv_parser.py`
 
