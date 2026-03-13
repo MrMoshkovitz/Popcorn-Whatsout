@@ -22,7 +22,7 @@
 | 7 | Cron + Docs | 7.1–7.4 | Complete |
 | 8 | Integration Testing | 8.1–8.3 | Complete |
 | 9 | Documentation + Polish | 9.1–9.4 | Complete |
-| 10 | Definition of Done | 10.1–10.3 | Not started |
+| 10 | Definition of Done | 10.1–10.3 | Complete |
 
 **Total: 45 tasks**
 
@@ -1427,7 +1427,7 @@ python -c "import sys; sys.path.insert(0, '.'); from ingestion.csv_parser import
 
 ## Phase 10: Definition of Done
 
-### - [ ] Task 10.1 — Verify all tests pass
+### - [x] Task 10.1 — Verify all tests pass
 
 **Files:** None (verification only)
 
@@ -1443,7 +1443,7 @@ python -m pytest tests/ -v --tb=short
 
 ---
 
-### - [ ] Task 10.2 — Verify dashboard starts
+### - [x] Task 10.2 — Verify dashboard starts
 
 **Files:** None (verification only)
 
@@ -1459,7 +1459,7 @@ python -c "import sys, os; sys.path.insert(0, '.'); os.environ['TMDB_API_KEY'] =
 
 ---
 
-### - [ ] Task 10.3 — Final DoD checklist verification
+### - [x] Task 10.3 — Final DoD checklist verification
 
 **Files:** None (verification only)
 
