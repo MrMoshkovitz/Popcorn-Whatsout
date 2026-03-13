@@ -1339,7 +1339,7 @@ python -c "content = open('README.md', encoding='utf-8').read(); assert 'Popcorn
 
 ---
 
-### - [ ] Task 9.2 — Create CHANGELOG.md
+### - [x] Task 9.2 — Create CHANGELOG.md
 
 **Files:** `CHANGELOG.md`
 
