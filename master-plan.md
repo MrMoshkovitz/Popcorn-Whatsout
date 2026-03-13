@@ -1173,7 +1173,7 @@ python -c "import sys; sys.path.insert(0, '.'); from cron.daily_check import dai
 
 ---
 
-### - [ ] Task 7.2 — Write daily_check tests
+### - [x] Task 7.2 — Write daily_check tests
 
 **Files:** `tests/test_daily_check.py`
 
