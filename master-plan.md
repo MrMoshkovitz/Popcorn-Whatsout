@@ -538,7 +538,7 @@ python -m pytest tests/test_tmdb_matcher.py -v
 
 ## Phase 4: Engines
 
-### - [ ] Task 4.1 — Implement engine/recommendations.py
+### - [x] Task 4.1 — Implement engine/recommendations.py
 
 **Files:** `engine/recommendations.py`
 
