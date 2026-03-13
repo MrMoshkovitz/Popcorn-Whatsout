@@ -489,8 +489,8 @@ main() {
         # Reset consecutive limits on successful run
         consecutive_limits=0
 
-        # Check for BUILD HALTED
-        if grep -qF "BUILD HALTED" "$PLAN_FILE" 2>/dev/null; then
+        # Check for BUILD HALTED (must be an actual heading, not inside a code block example)
+        if grep -qE '^## BUILD HALTED' "$PLAN_FILE" 2>/dev/null; then
             log_error "BUILD HALTED marker found in master-plan.md."
             log_error "3+ consecutive tasks failed. Human review needed."
             save_state "$iteration" "halted"
