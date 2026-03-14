@@ -15,6 +15,7 @@
             <th dir="auto">Type</th>
             <th dir="auto">Watched</th>
             <th dir="auto">Last Watched</th>
+            <th dir="auto"></th>
         </tr>
     </thead>
     <tbody>
@@ -31,6 +32,15 @@
             <td dir="auto"><small dir="auto">{{ title.tmdb_type }}</small></td>
             <td dir="auto">{{ title.watch_count }}</td>
             <td dir="auto">{{ title.last_watched }}</td>
+            <td>
+                <a href="/edit/{{ title.id }}" role="button" class="outline secondary"
+                   style="padding:2px 8px;font-size:0.75em;">Edit</a>
+                <form method="post" action="/delete/{{ title.id }}" style="display:inline;"
+                      onsubmit="return confirm('Delete this title and all related data?')">
+                    <button type="submit" class="outline secondary"
+                            style="padding:2px 8px;font-size:0.75em;">Delete</button>
+                </form>
+            </td>
         </tr>
         {% endfor %}
     </tbody>

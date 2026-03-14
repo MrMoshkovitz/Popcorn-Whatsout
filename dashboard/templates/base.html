@@ -74,8 +74,8 @@
                                     input.value = item.title;
                                     var form = input.closest('form');
                                     if (form) {
-                                        var idField = form.querySelector('[name="tmdb_id"]');
-                                        var typeField = form.querySelector('[name="tmdb_type"]');
+                                        var idField = form.querySelector('[name="tmdb_id"]') || form.querySelector('[name="new_tmdb_id"]');
+                                        var typeField = form.querySelector('[name="tmdb_type"]') || form.querySelector('[name="new_tmdb_type"]');
                                         if (idField) idField.value = item.tmdb_id;
                                         if (typeField) typeField.value = item.media_type;
 

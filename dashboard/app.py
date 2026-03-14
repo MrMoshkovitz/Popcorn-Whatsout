@@ -379,5 +379,87 @@ def dismiss(rec_id):
     return redirect(url_for('watch_next'))
 
 
+@app.route('/delete/<int:title_id>', methods=['POST'])
+def delete_title(title_id):
+    conn = get_db()
+    try:
+        title = conn.execute(
+            "SELECT COALESCE(title_he, title_en) AS name, tmdb_id, tmdb_type FROM titles WHERE id = ?",
+            (title_id,)
+        ).fetchone()
+        if not title:
+            flash('Title not found.')
+            return redirect(url_for('library'))
+
+        name = title['name']
+        conn.execute("DELETE FROM watch_history WHERE title_id = ?", (title_id,))
+        conn.execute("DELETE FROM series_tracking WHERE title_id = ?", (title_id,))
+        conn.execute("DELETE FROM recommendations WHERE source_title_id = ?", (title_id,))
+        conn.execute("DELETE FROM streaming_availability WHERE tmdb_id = ? AND tmdb_type = ?",
+                     (title['tmdb_id'], title['tmdb_type']))
+        conn.execute("DELETE FROM titles WHERE id = ?", (title_id,))
+        conn.commit()
+        flash(f'Deleted: {name}')
+    finally:
+        conn.close()
+    return redirect(url_for('library'))
+
+
+@app.route('/edit/<int:title_id>')
+def edit_title(title_id):
+    conn = get_db()
+    try:
+        title = conn.execute("""
+            SELECT t.id, t.tmdb_id, t.tmdb_type, t.title_he, t.title_en, t.poster_path,
+                   st.max_watched_season, st.total_seasons_tmdb
+            FROM titles t
+            LEFT JOIN series_tracking st ON t.id = st.title_id
+            WHERE t.id = ?
+        """, (title_id,)).fetchone()
+        if not title:
+            flash('Title not found.')
+            return redirect(url_for('library'))
+        return render_template('edit.html', title=title, review_count=get_review_count())
+    finally:
+        conn.close()
+
+
+@app.route('/edit/<int:title_id>', methods=['POST'])
+def edit_title_post(title_id):
+    conn = get_db()
+    try:
+        # Handle TMDB re-match
+        new_tmdb_id = request.form.get('new_tmdb_id', type=int)
+        new_tmdb_type = request.form.get('new_tmdb_type', '')
+        if new_tmdb_id and new_tmdb_type in ('movie', 'tv'):
+            details_he = tmdb_get(f'/{new_tmdb_type}/{new_tmdb_id}', {'language': 'he-IL'})
+            details_en = tmdb_get(f'/{new_tmdb_type}/{new_tmdb_id}', {'language': 'en-US'})
+            conn.execute("""
+                UPDATE titles SET tmdb_id = ?, tmdb_type = ?, title_he = ?, title_en = ?,
+                       poster_path = ?, match_status = 'manual', confidence = 1.0
+                WHERE id = ?
+            """, (
+                new_tmdb_id, new_tmdb_type,
+                (details_he or {}).get('title') or (details_he or {}).get('name'),
+                (details_en or {}).get('title') or (details_en or {}).get('name'),
+                (details_he or details_en or {}).get('poster_path'),
+                title_id,
+            ))
+
+        # Handle watched seasons update for TV
+        watched_seasons = request.form.get('watched_seasons', type=int)
+        if watched_seasons is not None and watched_seasons >= 0:
+            conn.execute(
+                "UPDATE series_tracking SET max_watched_season = ? WHERE title_id = ?",
+                (watched_seasons, title_id)
+            )
+
+        conn.commit()
+        flash('Title updated.')
+    finally:
+        conn.close()
+    return redirect(url_for('library'))
+
+
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
