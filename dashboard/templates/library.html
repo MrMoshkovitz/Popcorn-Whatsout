@@ -6,12 +6,31 @@
 {% block content %}
 {% if titles %}
 <h2 class="section-title" dir="auto">Your Library</h2>
-<div class="poster-grid">
+<div class="filter-bar" dir="auto">
+    <input type="text" class="filter-search" id="lib-search" placeholder="Search library..." dir="auto">
+    <div class="filter-pills" id="lib-type-filter">
+        <button class="filter-pill active" data-filter="all">All</button>
+        <button class="filter-pill" data-filter="tv">TV</button>
+        <button class="filter-pill" data-filter="movie">Movie</button>
+    </div>
+    <select class="filter-sort" id="lib-sort">
+        <option value="recent">Last watched</option>
+        <option value="title">Title A-Z</option>
+        <option value="added">Recently added</option>
+    </select>
+</div>
+<div class="poster-grid" id="lib-grid">
     {% for title in titles %}
-    <div class="poster-card">
+    {% set display_name = (title.title_en or title.title_he) if title.original_language != 'he' else (title.title_he or title.title_en) %}
+    <div class="poster-card"
+         data-title="{{ display_name }}"
+         data-type="{{ title.tmdb_type }}"
+         data-tag="{{ title.user_tag or 'both' }}"
+         data-watched="{{ title.last_watched or '' }}"
+         data-id="{{ title.id }}">
         {% if title.poster_path %}
         <img class="poster-img" src="https://image.tmdb.org/t/p/w300{{ title.poster_path }}"
-             alt="{{ (title.title_en or title.title_he) if title.original_language != 'he' else (title.title_he or title.title_en) }}" dir="auto">
+             alt="{{ display_name }}" dir="auto">
         {% else %}
         <div class="poster-placeholder">&#127916;</div>
         {% endif %}
@@ -27,7 +46,7 @@
         </div>
 
         <div class="card-info">
-            <p class="card-title" dir="auto">{{ (title.title_en or title.title_he) if title.original_language != 'he' else (title.title_he or title.title_en) }}</p>
+            <p class="card-title" dir="auto">{{ display_name }}</p>
             {% if title.tmdb_type == 'tv' and title.max_watched_season is not none %}
             <p class="card-sub" dir="auto">
                 S{{ title.max_watched_season }}/{{ title.total_seasons_tmdb or '?' }} seasons
@@ -113,32 +132,90 @@
 (function() {
     var zone = document.getElementById('drop-zone');
     var input = document.getElementById('csv-input');
-    if (!zone || !input) return;
-
-    zone.addEventListener('dragover', function(e) {
-        e.preventDefault();
-        zone.classList.add('drag-over');
-    });
-    zone.addEventListener('dragleave', function() {
-        zone.classList.remove('drag-over');
-    });
-    zone.addEventListener('drop', function(e) {
-        e.preventDefault();
-        zone.classList.remove('drag-over');
-        if (e.dataTransfer.files.length) {
-            var dt = new DataTransfer();
-            for (var i = 0; i < e.dataTransfer.files.length; i++) {
-                dt.items.add(e.dataTransfer.files[i]);
+    if (zone && input) {
+        zone.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            zone.classList.add('drag-over');
+        });
+        zone.addEventListener('dragleave', function() {
+            zone.classList.remove('drag-over');
+        });
+        zone.addEventListener('drop', function(e) {
+            e.preventDefault();
+            zone.classList.remove('drag-over');
+            if (e.dataTransfer.files.length) {
+                var dt = new DataTransfer();
+                for (var i = 0; i < e.dataTransfer.files.length; i++) {
+                    dt.items.add(e.dataTransfer.files[i]);
+                }
+                input.files = dt.files;
+                zone.querySelector('p').textContent = e.dataTransfer.files[0].name;
             }
-            input.files = dt.files;
-            zone.querySelector('p').textContent = e.dataTransfer.files[0].name;
-        }
-    });
-    input.addEventListener('change', function() {
-        if (input.files.length) {
-            zone.querySelector('p').textContent = input.files[0].name;
-        }
-    });
+        });
+        input.addEventListener('change', function() {
+            if (input.files.length) {
+                zone.querySelector('p').textContent = input.files[0].name;
+            }
+        });
+    }
+
+    /* Library filter/search/sort */
+    var grid = document.getElementById('lib-grid');
+    var searchInput = document.getElementById('lib-search');
+    var typeFilter = document.getElementById('lib-type-filter');
+    var sortSelect = document.getElementById('lib-sort');
+    if (!grid) return;
+
+    var activeType = 'all';
+
+    function applyFilters() {
+        var query = (searchInput ? searchInput.value : '').toLowerCase();
+        var cards = grid.querySelectorAll('.poster-card');
+        cards.forEach(function(card) {
+            var title = (card.getAttribute('data-title') || '').toLowerCase();
+            var type = card.getAttribute('data-type') || '';
+            var matchSearch = !query || title.indexOf(query) !== -1;
+            var matchType = activeType === 'all' || type === activeType;
+            card.style.display = (matchSearch && matchType) ? '' : 'none';
+        });
+    }
+
+    function applySort() {
+        var cards = Array.from(grid.querySelectorAll('.poster-card'));
+        var sortBy = sortSelect ? sortSelect.value : 'recent';
+        cards.sort(function(a, b) {
+            if (sortBy === 'title') {
+                return (a.getAttribute('data-title') || '').localeCompare(b.getAttribute('data-title') || '');
+            } else if (sortBy === 'added') {
+                return (parseInt(b.getAttribute('data-id')) || 0) - (parseInt(a.getAttribute('data-id')) || 0);
+            } else {
+                var da = a.getAttribute('data-watched') || '';
+                var db = b.getAttribute('data-watched') || '';
+                return db.localeCompare(da);
+            }
+        });
+        cards.forEach(function(card) { grid.appendChild(card); });
+    }
+
+    if (searchInput) {
+        searchInput.addEventListener('input', applyFilters);
+    }
+    if (typeFilter) {
+        typeFilter.addEventListener('click', function(e) {
+            var btn = e.target.closest('.filter-pill');
+            if (!btn) return;
+            typeFilter.querySelectorAll('.filter-pill').forEach(function(b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            activeType = btn.getAttribute('data-filter');
+            applyFilters();
+        });
+    }
+    if (sortSelect) {
+        sortSelect.addEventListener('change', function() {
+            applySort();
+            applyFilters();
+        });
+    }
 })();
 </script>
 {% endblock %}

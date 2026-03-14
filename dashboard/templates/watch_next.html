@@ -4,51 +4,71 @@
 {% block title %}Watch Next{% endblock %}
 
 {% block content %}
+<div class="hero">
+    <h1 dir="auto">What to Watch Tonight</h1>
+    <p dir="auto">Personalized picks from your viewing history</p>
+</div>
 
 {% if continue_watching %}
-<p class="section-label" dir="auto">Continue Watching</p>
-{% for item in continue_watching %}
-<div class="h-card">
-    {% if item.poster_path %}
-    <img class="h-card-poster" src="https://image.tmdb.org/t/p/w200{{ item.poster_path }}"
-         alt="{{ item.title }}" dir="auto">
-    {% endif %}
-    <div class="h-card-body">
-        <h4 dir="auto">{{ item.title }}</h4>
-        <span class="season-badge" dir="auto">Season {{ item.next_season }} available</span>
-        {% if item.total_seasons > item.next_season %}
-        <p class="detail" dir="auto">{{ item.total_seasons }} seasons total</p>
+<h2 class="section-title" dir="auto">Continue Watching</h2>
+<div class="scroll-row">
+    {% for item in continue_watching %}
+    <div class="poster-card">
+        {% if item.poster_path %}
+        <img class="poster-img" src="https://image.tmdb.org/t/p/w300{{ item.poster_path }}"
+             alt="{{ item.title }}" dir="auto">
+        {% else %}
+        <div class="poster-placeholder">&#127916;</div>
         {% endif %}
+        <div class="season-overlay" dir="auto">Season {{ item.next_season }} available</div>
         {% if item.providers %}
-        <div class="card-providers">
-            {% for provider in item.providers %}
-            {% if provider.provider_logo_path %}
-            <img src="https://image.tmdb.org/t/p/original{{ provider.provider_logo_path }}"
-                 alt="{{ provider.provider_name }}" dir="auto"
-                 title="{{ provider.provider_name }} ({{ provider.monetization_type }})">
-            {% endif %}
-            {% endfor %}
+        <div class="card-info">
+            <div class="provider-row">
+                {% for provider in item.providers %}
+                {% if provider.provider_logo_path %}
+                <img src="https://image.tmdb.org/t/p/original{{ provider.provider_logo_path }}"
+                     alt="{{ provider.provider_name }}" dir="auto"
+                     title="{{ provider.provider_name }} ({{ provider.monetization_type }})">
+                {% endif %}
+                {% endfor %}
+            </div>
         </div>
         {% endif %}
+        <div class="card-info">
+            <p class="card-title" dir="auto">{{ item.title }}</p>
+            {% if item.total_seasons > item.next_season %}
+            <p class="card-sub" dir="auto">{{ item.total_seasons }} seasons total</p>
+            {% endif %}
+        </div>
     </div>
+    {% endfor %}
 </div>
-{% endfor %}
 {% endif %}
 
 {% if recommendations %}
-<p class="section-label" dir="auto">Recommended For You</p>
-<div class="card-grid">
+<h2 class="section-title" dir="auto">Recommended For You</h2>
+<div class="filter-bar" dir="auto">
+    <input type="text" class="filter-search" id="rec-search" placeholder="Search recommendations..." dir="auto">
+</div>
+<div class="poster-grid" id="rec-grid">
     {% for rec in recommendations %}
-    <div class="card">
+    <div class="poster-card" data-title="{{ rec.recommended_title }}" data-source="{{ rec.source_title }}">
         {% if rec.poster_path %}
-        <img class="card-poster" src="https://image.tmdb.org/t/p/w200{{ rec.poster_path }}"
+        <img class="poster-img" src="https://image.tmdb.org/t/p/w300{{ rec.poster_path }}"
              alt="{{ rec.recommended_title }}" dir="auto">
+        {% else %}
+        <div class="poster-placeholder">&#127916;</div>
         {% endif %}
-        <div class="card-body">
+        <div class="hover-overlay">
+            <form method="post" action="/dismiss/{{ rec.id }}">
+                <button type="submit" class="btn-sm btn-dismiss">Dismiss</button>
+            </form>
+        </div>
+        <div class="card-info">
             <p class="card-title" dir="auto">{{ rec.recommended_title }}</p>
             <p class="card-sub" dir="auto">Based on {{ rec.source_title }}</p>
             {% if rec.providers %}
-            <div class="card-providers">
+            <div class="provider-row">
                 {% for provider in rec.providers %}
                 {% if provider.provider_logo_path %}
                 <img src="https://image.tmdb.org/t/p/original{{ provider.provider_logo_path }}"
@@ -58,11 +78,6 @@
                 {% endfor %}
             </div>
             {% endif %}
-        </div>
-        <div class="card-actions">
-            <form method="post" action="/dismiss/{{ rec.id }}">
-                <button type="submit" class="secondary outline" dir="auto">Dismiss</button>
-            </form>
         </div>
     </div>
     {% endfor %}
@@ -75,4 +90,22 @@
     <p dir="auto">No recommendations yet.<br>Upload your Netflix history to get started!</p>
 </div>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    var grid = document.getElementById('rec-grid');
+    var searchInput = document.getElementById('rec-search');
+    if (!grid || !searchInput) return;
+    searchInput.addEventListener('input', function() {
+        var query = searchInput.value.toLowerCase();
+        grid.querySelectorAll('.poster-card').forEach(function(card) {
+            var title = (card.getAttribute('data-title') || '').toLowerCase();
+            var source = (card.getAttribute('data-source') || '').toLowerCase();
+            card.style.display = (!query || title.indexOf(query) !== -1 || source.indexOf(query) !== -1) ? '' : 'none';
+        });
+    });
+})();
+</script>
 {% endblock %}
