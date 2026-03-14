@@ -23,12 +23,13 @@ def _build_matched_title(parsed_name: str, result: dict, media_type: str) -> dic
     confidence = calculate_confidence(parsed_name, result)
     match_status = "auto" if confidence >= MATCH_CONFIDENCE_THRESHOLD else "review"
 
+    # From he-IL search: "title"/"name" = Hebrew localized, "original_title"/"original_name" = original language
     if media_type == "movie":
-        title_en = result.get("title")
+        title_he = result.get("title")
     else:
-        title_en = result.get("name")
+        title_he = result.get("name")
 
-    title_he = result.get("original_title") or result.get("original_name")
+    title_en = result.get("original_title") or result.get("original_name")
 
     return {
         "parsed_name": parsed_name,
@@ -36,6 +37,7 @@ def _build_matched_title(parsed_name: str, result: dict, media_type: str) -> dic
         "tmdb_type": media_type,
         "title_he": title_he,
         "title_en": title_en,
+        "original_language": result.get("original_language"),
         "confidence": confidence,
         "match_status": match_status,
         "poster_path": result.get("poster_path"),
@@ -55,6 +57,7 @@ def _match_single(parsed_name: str, media_type_hint: str) -> dict:
         "tmdb_type": media_type_hint,
         "title_he": None,
         "title_en": None,
+        "original_language": None,
         "confidence": 0.0,
         "match_status": "review",
         "poster_path": None,
@@ -89,6 +92,7 @@ def match_entries(entries: list[dict], conn: sqlite3.Connection, user_tag: str =
                 "tmdb_type": entry["media_type_hint"],
                 "title_he": None,
                 "title_en": None,
+                "original_language": None,
                 "confidence": 0.0,
                 "match_status": "review",
                 "poster_path": None,
@@ -106,11 +110,11 @@ def match_entries(entries: list[dict], conn: sqlite3.Connection, user_tag: str =
 
         cursor.execute(
             """INSERT OR REPLACE INTO titles
-               (tmdb_id, tmdb_type, title_en, title_he, poster_path, confidence, match_status, source, user_tag)
-               VALUES (?, ?, ?, ?, ?, ?, ?, 'csv', ?)""",
+               (tmdb_id, tmdb_type, title_en, title_he, poster_path, original_language, confidence, match_status, source, user_tag)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'csv', ?)""",
             (match["tmdb_id"], match["tmdb_type"], match["title_en"],
-             match["title_he"], match["poster_path"], match["confidence"],
-             match["match_status"], user_tag),
+             match["title_he"], match["poster_path"], match.get("original_language"),
+             match["confidence"], match["match_status"], user_tag),
         )
 
         # Get the title_id
@@ -163,15 +167,26 @@ def match_entries(entries: list[dict], conn: sqlite3.Connection, user_tag: str =
 
         # Fetch total seasons from TMDB
         total_seasons = None
+        total_episodes = None
+        next_air_date = None
         detail = tmdb_get(f"/tv/{match['tmdb_id']}", {"language": "en-US"})
         if detail:
             total_seasons = detail.get("number_of_seasons")
+            total_episodes = detail.get("number_of_episodes")
+            next_season = (max_season or 0) + 1
+            if next_season <= (total_seasons or 0):
+                for s in detail.get("seasons", []):
+                    if s.get("season_number") == next_season:
+                        next_air_date = s.get("air_date")
+                        break
 
         cursor.execute(
             """INSERT OR IGNORE INTO series_tracking
-               (title_id, tmdb_id, total_seasons_tmdb, max_watched_season, status)
-               VALUES (?, ?, ?, ?, 'watching')""",
-            (title_id, match["tmdb_id"], total_seasons, max_season),
+               (title_id, tmdb_id, total_seasons_tmdb, max_watched_season,
+                next_season_air_date, total_episodes_tmdb, status)
+               VALUES (?, ?, ?, ?, ?, ?, 'watching')""",
+            (title_id, match["tmdb_id"], total_seasons, max_season,
+             next_air_date, total_episodes),
         )
 
     # Step 6: Commit once

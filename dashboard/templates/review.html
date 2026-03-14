@@ -3,48 +3,48 @@
 {% block title %}Review Matches{% endblock %}
 
 {% block content %}
-<p class="section-label" dir="auto">Review Matches</p>
+<h2 class="section-title" dir="auto">Review Matches</h2>
 
 {% if review_items %}
-<p dir="auto" style="color:var(--popcorn-muted);">These titles had low confidence matches. Please confirm or correct them.</p>
+<p dir="auto" style="color:var(--text-muted);font-size:0.9em;margin-bottom:1rem;">
+    These titles had low confidence matches. Confirm or correct them.
+</p>
 
 {% for item in review_items %}
 <div class="review-card">
-    <header>
+    {% if item.poster_path %}
+    <img class="review-poster" src="https://image.tmdb.org/t/p/w200{{ item.poster_path }}"
+         alt="{{ (item.title_en or item.title_he) if item.original_language != 'he' else (item.title_he or item.title_en) }}" dir="auto">
+    {% endif %}
+    <div class="review-body">
         <h3 dir="auto">{{ item.raw_title }}</h3>
-        <p dir="auto"><small dir="auto">Confidence: {{ "%.0f"|format(item.confidence * 100) }}%</small></p>
-    </header>
-
-    <div class="grid">
-        <div>
-            <h4 dir="auto">Current Guess</h4>
-            {% if item.poster_path %}
-            <img src="https://image.tmdb.org/t/p/w200{{ item.poster_path }}"
-                 alt="{{ item.title_he or item.title_en }}" dir="auto"
-                 style="max-width: 160px; border-radius: 6px;">
+        <p class="review-meta" dir="auto">
+            Current guess: <strong dir="auto">{{ (item.title_en or item.title_he) if item.original_language != 'he' else (item.title_he or item.title_en) }}</strong>
+            · {{ item.tmdb_type | upper }}
+            · <span class="confidence">{{ "%.0f"|format(item.confidence * 100) }}%</span>
+            {% if item.user_tag %}
+            · <span class="tag-badge tag-{{ item.user_tag }}">{{ item.user_tag }}</span>
             {% endif %}
-            <p dir="auto">{{ item.title_he or item.title_en }}</p>
-            <p dir="auto"><small dir="auto" style="color:var(--popcorn-muted);">{{ item.tmdb_type }} — TMDB ID: {{ item.tmdb_id }}</small></p>
+        </p>
 
+        <div class="review-actions">
             <form method="post" action="/resolve/{{ item.id }}">
                 <input type="hidden" name="tmdb_id" value="{{ item.tmdb_id }}">
                 <input type="hidden" name="tmdb_type" value="{{ item.tmdb_type }}">
-                <button type="submit" dir="auto">Accept This Match</button>
+                <button type="submit" dir="auto">Accept Match</button>
             </form>
         </div>
 
-        <div>
-            <h4 dir="auto">Search for Correct Title</h4>
-            <form method="post" action="/resolve/{{ item.id }}">
-                <fieldset role="group">
+        <div class="review-search">
+            <form method="post" action="/resolve/{{ item.id }}" style="display:flex;gap:0.5rem;flex:1;align-items:start;flex-wrap:wrap;">
+                <div style="flex:1;min-width:200px;position:relative;">
                     <input type="text" name="query" class="autocomplete-input"
-                           placeholder="Search TMDB..." dir="auto"
-                           autocomplete="off" minlength="3">
+                           placeholder="Search for correct title..." dir="auto"
+                           autocomplete="off" minlength="3" style="margin:0;width:100%;">
                     <input type="hidden" name="new_tmdb_id" value="">
                     <input type="hidden" name="new_tmdb_type" value="">
-                    <button type="submit" dir="auto">Use This</button>
-                </fieldset>
-                <div class="autocomplete-results" dir="auto"></div>
+                </div>
+                <button type="submit" class="btn-outline" dir="auto">Use This</button>
             </form>
         </div>
     </div>

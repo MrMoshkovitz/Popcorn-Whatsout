@@ -5,94 +5,140 @@
 
 {% block content %}
 {% if titles %}
-<p class="section-label" dir="auto">Your Library</p>
-<table role="grid">
-    <thead>
-        <tr>
-            <th dir="auto"></th>
-            <th dir="auto">Title</th>
-            <th dir="auto">Type</th>
-            <th dir="auto">Who</th>
-            <th dir="auto">Watched</th>
-            <th dir="auto">Last Watched</th>
-            <th dir="auto"></th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for title in titles %}
-        <tr>
-            <td>
-                {% if title.poster_path %}
-                <img src="https://image.tmdb.org/t/p/w200{{ title.poster_path }}"
-                     alt="{{ title.title_he or title.title_en }}" dir="auto">
-                {% endif %}
-            </td>
-            <td dir="auto">{{ title.title_he or title.title_en }}</td>
-            <td dir="auto"><span class="type-badge">{{ title.tmdb_type }}</span></td>
-            <td dir="auto"><span class="tag-badge tag-{{ title.user_tag or 'both' }}">{{ title.user_tag or 'both' }}</span></td>
-            <td dir="auto">{{ title.watch_count }}</td>
-            <td dir="auto">{{ title.last_watched }}</td>
-            <td>
-                <div class="action-group">
-                    <a href="/edit/{{ title.id }}" role="button" class="outline secondary">Edit</a>
-                    <form method="post" action="/delete/{{ title.id }}"
-                          onsubmit="return confirm('Delete this title and all related data?')">
-                        <button type="submit" class="outline secondary">Delete</button>
-                    </form>
-                </div>
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+<h2 class="section-title" dir="auto">Your Library</h2>
+<div class="poster-grid">
+    {% for title in titles %}
+    <div class="poster-card">
+        {% if title.poster_path %}
+        <img class="poster-img" src="https://image.tmdb.org/t/p/w300{{ title.poster_path }}"
+             alt="{{ (title.title_en or title.title_he) if title.original_language != 'he' else (title.title_he or title.title_en) }}" dir="auto">
+        {% else %}
+        <div class="poster-placeholder">&#127916;</div>
+        {% endif %}
+
+        <span class="poster-badge badge-{{ title.tmdb_type }}" dir="auto">{{ title.tmdb_type }}</span>
+
+        <div class="hover-overlay">
+            <a href="/edit/{{ title.id }}" class="btn-sm btn-edit">Edit</a>
+            <form method="post" action="/delete/{{ title.id }}"
+                  onsubmit="return confirm('Delete this title and all related data?')">
+                <button type="submit" class="btn-sm btn-delete">Delete</button>
+            </form>
+        </div>
+
+        <div class="card-info">
+            <p class="card-title" dir="auto">{{ (title.title_en or title.title_he) if title.original_language != 'he' else (title.title_he or title.title_en) }}</p>
+            {% if title.tmdb_type == 'tv' and title.max_watched_season is not none %}
+            <p class="card-sub" dir="auto">
+                S{{ title.max_watched_season }}/{{ title.total_seasons_tmdb or '?' }} seasons
+                {% if title.total_episodes_tmdb %} · {{ title.watch_count }}/{{ title.total_episodes_tmdb }} eps{% endif %}
+            </p>
+            {% else %}
+            <p class="card-sub" dir="auto">{{ title.watch_count }} entr{{ 'y' if title.watch_count == 1 else 'ies' }}{% if title.last_watched %} · {{ title.last_watched }}{% endif %}</p>
+            {% endif %}
+            <div style="margin-top:0.2rem;">
+                <span class="tag-badge tag-{{ title.user_tag or 'both' }}">{{ title.user_tag or 'both' }}</span>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div style="text-align:right;margin-top:1rem;">
+    <form method="post" action="/delete-all" style="display:inline"
+          onsubmit="return confirm('Delete ALL titles, history, and recommendations? This cannot be undone.')">
+        <button type="submit" class="clear-library-btn">Clear Library</button>
+    </form>
+</div>
 {% else %}
 <div class="empty-state">
     <div class="icon">&#128218;</div>
-    <p dir="auto">Your library is empty. Upload your Netflix viewing history to get started!</p>
+    <p dir="auto">Your library is empty. Upload a CSV or add titles manually.</p>
 </div>
 {% endif %}
 
-<hr>
+<div class="action-section">
+    <h3 dir="auto">Upload Netflix CSV</h3>
+    <form method="post" action="/upload" enctype="multipart/form-data" id="upload-form">
+        <div class="upload-zone" id="drop-zone" onclick="document.getElementById('csv-input').click()">
+            <div class="upload-icon">&#128196;</div>
+            <p dir="auto">Drop your Netflix CSV here or click to browse</p>
+            <input type="file" name="csv_file" accept=".csv" id="csv-input" dir="auto">
+        </div>
+        <div class="upload-controls">
+            <label for="upload_user_tag" dir="auto" style="margin:0;font-size:0.85em;">Who watched:</label>
+            <select name="user_tag" id="upload_user_tag" style="width:auto;margin:0;">
+                <option value="both">Both</option>
+                <option value="me">Me</option>
+                <option value="wife">Wife</option>
+            </select>
+            <button type="submit" dir="auto">Upload</button>
+        </div>
+    </form>
+</div>
 
-<p class="section-label" dir="auto">Upload Netflix CSV</p>
-<form method="post" action="/upload" enctype="multipart/form-data">
-    <label for="upload_user_tag" dir="auto">Whose history?</label>
-    <select name="user_tag" id="upload_user_tag" style="width:auto;display:inline-block;margin-bottom:0.5rem;">
-        <option value="both">Both</option>
-        <option value="me">Me</option>
-        <option value="wife">Wife</option>
-    </select>
-    <fieldset role="group">
-        <input type="file" name="csv_file" accept=".csv" dir="auto">
-        <button type="submit" dir="auto">Upload</button>
-    </fieldset>
-</form>
+<div class="action-section">
+    <h3 dir="auto">Add a Title</h3>
+    <form method="post" action="/add" id="add-form">
+        <div style="display:flex;gap:0.5rem;align-items:start;">
+            <div style="flex:1;position:relative;">
+                <input type="text" name="query" class="autocomplete-input"
+                       placeholder="Search for a movie or TV show..." dir="auto"
+                       autocomplete="off" minlength="3" style="margin:0;width:100%;">
+                <input type="hidden" name="tmdb_id" value="">
+                <input type="hidden" name="tmdb_type" value="">
+            </div>
+            <button type="submit" dir="auto">Add</button>
+        </div>
+        <div class="autocomplete-results" dir="auto"></div>
+        <div id="seasons-input" style="display:none;margin-top:0.5rem;">
+            <label for="watched_seasons" dir="auto" style="font-size:0.85em;">Seasons watched:</label>
+            <input type="number" id="watched_seasons" name="watched_seasons"
+                   min="0" max="99" value="" style="width:100px;">
+        </div>
+        <div style="margin-top:0.5rem;">
+            <label for="add_user_tag" dir="auto" style="font-size:0.85em;margin:0;">Who watched:</label>
+            <select name="user_tag" id="add_user_tag" style="width:auto;margin:0;">
+                <option value="both">Both</option>
+                <option value="me">Me</option>
+                <option value="wife">Wife</option>
+            </select>
+        </div>
+    </form>
+</div>
+{% endblock %}
 
-<hr>
+{% block scripts %}
+<script>
+(function() {
+    var zone = document.getElementById('drop-zone');
+    var input = document.getElementById('csv-input');
+    if (!zone || !input) return;
 
-<p class="section-label" dir="auto">Add a Title</p>
-<form method="post" action="/add" id="add-form">
-    <fieldset role="group">
-        <input type="text" name="query" class="autocomplete-input"
-               placeholder="Search for a movie or TV show..." dir="auto"
-               autocomplete="off" minlength="3">
-        <input type="hidden" name="tmdb_id" value="">
-        <input type="hidden" name="tmdb_type" value="">
-        <button type="submit" dir="auto">Add</button>
-    </fieldset>
-    <div class="autocomplete-results" dir="auto"></div>
-    <div id="seasons-input" style="display:none;margin-top:0.5rem;">
-        <label for="watched_seasons" dir="auto">Seasons watched:</label>
-        <input type="number" id="watched_seasons" name="watched_seasons"
-               min="0" max="99" value="" style="width:120px;">
-    </div>
-    <div style="margin-top:0.5rem;">
-        <label for="add_user_tag" dir="auto">Who watched?</label>
-        <select name="user_tag" id="add_user_tag" style="width:auto;display:inline-block;">
-            <option value="both">Both</option>
-            <option value="me">Me</option>
-            <option value="wife">Wife</option>
-        </select>
-    </div>
-</form>
+    zone.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        zone.classList.add('drag-over');
+    });
+    zone.addEventListener('dragleave', function() {
+        zone.classList.remove('drag-over');
+    });
+    zone.addEventListener('drop', function(e) {
+        e.preventDefault();
+        zone.classList.remove('drag-over');
+        if (e.dataTransfer.files.length) {
+            var dt = new DataTransfer();
+            for (var i = 0; i < e.dataTransfer.files.length; i++) {
+                dt.items.add(e.dataTransfer.files[i]);
+            }
+            input.files = dt.files;
+            zone.querySelector('p').textContent = e.dataTransfer.files[0].name;
+        }
+    });
+    input.addEventListener('change', function() {
+        if (input.files.length) {
+            zone.querySelector('p').textContent = input.files[0].name;
+        }
+    });
+})();
+</script>
 {% endblock %}

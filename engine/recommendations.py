@@ -63,9 +63,13 @@ def _add_collection_recs(conn, tmdb_id: int, source_title_id: int):
             continue
         if _is_dismissed(conn, source_title_id, part["id"]):
             continue
+        if part.get("original_language") == "he":
+            part_title = part.get("title", "")
+        else:
+            part_title = part.get("original_title") or part.get("title", "")
         _upsert_recommendation(
             conn, source_title_id, part["id"], "movie",
-            part.get("title", ""), part.get("poster_path"),
+            part_title, part.get("poster_path"),
             part.get("vote_average", 0)
         )
         added += 1
@@ -90,7 +94,10 @@ def generate_recommendations(conn, tmdb_id: int, tmdb_type: str, source_title_id
         if _is_dismissed(conn, source_title_id, rec_tmdb_id):
             continue
 
-        rec_title = result.get("title") or result.get("name", "")
+        if result.get("original_language") == "he":
+            rec_title = result.get("title") or result.get("name", "")
+        else:
+            rec_title = result.get("original_title") or result.get("original_name") or result.get("title") or result.get("name", "")
         _upsert_recommendation(
             conn, source_title_id, rec_tmdb_id, rec_type, rec_title,
             result.get("poster_path"), result.get("vote_average", 0)

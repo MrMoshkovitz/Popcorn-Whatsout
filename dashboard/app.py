@@ -91,7 +91,7 @@ def watch_next():
         recommendations = conn.execute("""
             SELECT r.id, r.recommended_title, r.poster_path, r.recommended_tmdb_id,
                    r.recommended_type, t.title_he, t.title_en,
-                   COALESCE(t.title_he, t.title_en) AS source_title
+                   CASE WHEN t.original_language = 'he' THEN COALESCE(t.title_he, t.title_en) ELSE COALESCE(t.title_en, t.title_he) END AS source_title
             FROM recommendations r
             JOIN titles t ON r.source_title_id = t.id
             WHERE r.status = ?""" + tag_sql + """
@@ -115,13 +115,16 @@ def watch_next():
             })
 
         # Season gaps: series where user hasn't finished all available seasons
+        # Only show if next season air_date is known AND already released
         continue_rows = conn.execute("""
-            SELECT t.id, COALESCE(t.title_he, t.title_en) AS title,
+            SELECT t.id, CASE WHEN t.original_language = 'he' THEN COALESCE(t.title_he, t.title_en) ELSE COALESCE(t.title_en, t.title_he) END AS title,
                    t.poster_path, t.tmdb_id, t.tmdb_type,
                    st.max_watched_season, st.total_seasons_tmdb
             FROM series_tracking st
             JOIN titles t ON st.title_id = t.id
-            WHERE st.status = ? AND st.total_seasons_tmdb > st.max_watched_season""" + tag_sql + """
+            WHERE st.status = ? AND st.total_seasons_tmdb > st.max_watched_season
+              AND st.next_season_air_date IS NOT NULL
+              AND st.next_season_air_date <= date('now')""" + tag_sql + """
             ORDER BY t.title_en
         """, ('watching',) + tag_params).fetchall()
 
@@ -155,13 +158,15 @@ def coming_soon():
     try:
         tag_sql, tag_params = tag_filter_sql('t')
         alerts_rows = conn.execute("""
-            SELECT t.id, COALESCE(t.title_he, t.title_en) AS title,
+            SELECT t.id, CASE WHEN t.original_language = 'he' THEN COALESCE(t.title_he, t.title_en) ELSE COALESCE(t.title_en, t.title_he) END AS title,
                    t.poster_path, t.tmdb_id, t.tmdb_type,
-                   st.max_watched_season, st.total_seasons_tmdb
+                   st.max_watched_season, st.total_seasons_tmdb,
+                   st.next_season_air_date
             FROM series_tracking st
             JOIN titles t ON st.title_id = t.id
-            WHERE st.status = ? AND st.total_seasons_tmdb > st.max_watched_season""" + tag_sql + """
-            ORDER BY t.title_en
+            WHERE st.status = ? AND st.total_seasons_tmdb > st.max_watched_season
+              AND (st.next_season_air_date IS NULL OR st.next_season_air_date > date('now'))""" + tag_sql + """
+            ORDER BY st.next_season_air_date ASC
         """, ('watching',) + tag_params).fetchall()
 
         alerts = []
@@ -172,6 +177,18 @@ def coming_soon():
                 WHERE tmdb_id = ? AND tmdb_type = ?
             """, (row['tmdb_id'], row['tmdb_type'])).fetchall()
             new_season = (row['max_watched_season'] or 0) + 1
+            # Format air date for display
+            air_date_display = None
+            if row['next_season_air_date']:
+                try:
+                    from datetime import date as date_cls
+                    ad = datetime.strptime(row['next_season_air_date'], '%Y-%m-%d')
+                    air_date_display = ad.strftime('%b %d, %Y')
+                    days_until = (ad.date() - date_cls.today()).days
+                except (ValueError, TypeError):
+                    days_until = None
+            else:
+                days_until = None
             alerts.append({
                 'title': row['title'],
                 'poster_path': row['poster_path'],
@@ -179,6 +196,8 @@ def coming_soon():
                 'watched_season': row['max_watched_season'] or 0,
                 'total_seasons': row['total_seasons_tmdb'] or 0,
                 'providers': providers,
+                'air_date': air_date_display,
+                'days_until': days_until,
             })
 
         return render_template('coming_soon.html',
@@ -194,11 +213,13 @@ def library():
     try:
         tag_sql, tag_params = tag_filter_sql('t')
         titles = conn.execute("""
-            SELECT t.id, t.title_he, t.title_en, t.tmdb_type, t.poster_path,
+            SELECT t.id, t.title_he, t.title_en, t.original_language, t.tmdb_type, t.poster_path,
                    t.user_tag, COUNT(wh.id) AS watch_count,
-                   MAX(wh.watch_date) AS last_watched
+                   MAX(wh.watch_date) AS last_watched,
+                   st.max_watched_season, st.total_seasons_tmdb, st.total_episodes_tmdb
             FROM titles t
             LEFT JOIN watch_history wh ON t.id = wh.title_id
+            LEFT JOIN series_tracking st ON t.id = st.title_id
             WHERE 1=1""" + tag_sql + """
             GROUP BY t.id
             ORDER BY last_watched DESC
@@ -215,16 +236,17 @@ def library():
 def review():
     conn = get_db()
     try:
+        tag_sql, tag_params = tag_filter_sql('t')
         review_items = conn.execute("""
-            SELECT t.id, t.tmdb_id, t.tmdb_type, t.title_he, t.title_en,
-                   t.poster_path, t.confidence,
+            SELECT t.id, t.tmdb_id, t.tmdb_type, t.title_he, t.title_en, t.original_language,
+                   t.poster_path, t.confidence, t.user_tag,
                    wh.raw_csv_title AS raw_title
             FROM titles t
             LEFT JOIN watch_history wh ON t.id = wh.title_id
-            WHERE t.match_status = ?
+            WHERE t.match_status = ?""" + tag_sql + """
             GROUP BY t.id
-            ORDER BY t.confidence ASC
-        """, ('review',)).fetchall()
+            ORDER BY t.confidence DESC
+        """, ('review',) + tag_params).fetchall()
 
         return render_template('review.html',
                                review_items=review_items,
@@ -346,17 +368,19 @@ def add():
     details_he = tmdb_get(f'/{tmdb_type}/{tmdb_id}', {'language': 'he-IL'})
     details_en = tmdb_get(f'/{tmdb_type}/{tmdb_id}', {'language': 'en-US'})
 
+    original_language = (details_en or details_he or {}).get('original_language')
     conn = get_db()
     try:
         conn.execute("""
             INSERT OR REPLACE INTO titles
-            (tmdb_id, tmdb_type, title_he, title_en, poster_path, match_status, confidence, source, user_tag)
-            VALUES (?, ?, ?, ?, ?, 'manual', 1.0, 'manual', ?)
+            (tmdb_id, tmdb_type, title_he, title_en, poster_path, original_language, match_status, confidence, source, user_tag)
+            VALUES (?, ?, ?, ?, ?, ?, 'manual', 1.0, 'manual', ?)
         """, (
             tmdb_id, tmdb_type,
             (details_he or {}).get('title') or (details_he or {}).get('name'),
             (details_en or {}).get('title') or (details_en or {}).get('name'),
             (details_he or details_en or {}).get('poster_path'),
+            original_language,
             user_tag,
         ))
 
@@ -376,11 +400,21 @@ def add():
             if watched_seasons is None or watched_seasons < 0:
                 watched_seasons = num_seasons
             watched_seasons = min(watched_seasons, num_seasons)
+            next_season = watched_seasons + 1
+            next_air_date = None
+            if next_season <= num_seasons:
+                for s in (details_en or {}).get('seasons', []):
+                    if s.get('season_number') == next_season:
+                        next_air_date = s.get('air_date')
+                        break
+            total_episodes = (details_en or details_he or {}).get('number_of_episodes')
             conn.execute("""
                 INSERT OR REPLACE INTO series_tracking
-                (title_id, tmdb_id, max_watched_season, total_seasons_tmdb, status)
-                VALUES (?, ?, ?, ?, 'watching')
-            """, (title_id, tmdb_id, watched_seasons, num_seasons))
+                (title_id, tmdb_id, max_watched_season, total_seasons_tmdb,
+                 next_season_air_date, total_episodes_tmdb, status)
+                VALUES (?, ?, ?, ?, ?, ?, 'watching')
+            """, (title_id, tmdb_id, watched_seasons, num_seasons,
+                  next_air_date, total_episodes))
 
         conn.commit()
 
@@ -438,7 +472,7 @@ def delete_title(title_id):
     conn = get_db()
     try:
         title = conn.execute(
-            "SELECT COALESCE(title_he, title_en) AS name, tmdb_id, tmdb_type FROM titles WHERE id = ?",
+            "SELECT CASE WHEN original_language = 'he' THEN COALESCE(title_he, title_en) ELSE COALESCE(title_en, title_he) END AS name, tmdb_id, tmdb_type FROM titles WHERE id = ?",
             (title_id,)
         ).fetchone()
         if not title:
@@ -464,7 +498,7 @@ def edit_title(title_id):
     conn = get_db()
     try:
         title = conn.execute("""
-            SELECT t.id, t.tmdb_id, t.tmdb_type, t.title_he, t.title_en, t.poster_path,
+            SELECT t.id, t.tmdb_id, t.tmdb_type, t.title_he, t.title_en, t.original_language, t.poster_path,
                    t.user_tag, st.max_watched_season, st.total_seasons_tmdb
             FROM titles t
             LEFT JOIN series_tracking st ON t.id = st.title_id
@@ -490,13 +524,14 @@ def edit_title_post(title_id):
             details_en = tmdb_get(f'/{new_tmdb_type}/{new_tmdb_id}', {'language': 'en-US'})
             conn.execute("""
                 UPDATE titles SET tmdb_id = ?, tmdb_type = ?, title_he = ?, title_en = ?,
-                       poster_path = ?, match_status = 'manual', confidence = 1.0
+                       poster_path = ?, original_language = ?, match_status = 'manual', confidence = 1.0
                 WHERE id = ?
             """, (
                 new_tmdb_id, new_tmdb_type,
                 (details_he or {}).get('title') or (details_he or {}).get('name'),
                 (details_en or {}).get('title') or (details_en or {}).get('name'),
                 (details_he or details_en or {}).get('poster_path'),
+                (details_en or details_he or {}).get('original_language'),
                 title_id,
             ))
 
@@ -511,13 +546,44 @@ def edit_title_post(title_id):
         # Handle watched seasons update for TV
         watched_seasons = request.form.get('watched_seasons', type=int)
         if watched_seasons is not None and watched_seasons >= 0:
+            row = conn.execute(
+                "SELECT tmdb_id, total_seasons_tmdb FROM series_tracking WHERE title_id = ?",
+                (title_id,)
+            ).fetchone()
+            next_air_date = None
+            if row:
+                next_season = watched_seasons + 1
+                if next_season <= (row['total_seasons_tmdb'] or 0):
+                    detail = tmdb_get(f"/tv/{row['tmdb_id']}", {"language": "en-US"})
+                    if detail:
+                        for s in detail.get('seasons', []):
+                            if s.get('season_number') == next_season:
+                                next_air_date = s.get('air_date')
+                                break
             conn.execute(
-                "UPDATE series_tracking SET max_watched_season = ? WHERE title_id = ?",
-                (watched_seasons, title_id)
+                "UPDATE series_tracking SET max_watched_season = ?, next_season_air_date = ? WHERE title_id = ?",
+                (watched_seasons, next_air_date, title_id)
             )
 
         conn.commit()
         flash('Title updated.')
+    finally:
+        conn.close()
+    return redirect(url_for('library'))
+
+
+@app.route('/delete-all', methods=['POST'])
+def delete_all():
+    conn = get_db()
+    try:
+        conn.execute("DELETE FROM watch_history")
+        conn.execute("DELETE FROM series_tracking")
+        conn.execute("DELETE FROM recommendations")
+        conn.execute("DELETE FROM streaming_availability")
+        conn.execute("DELETE FROM titles")
+        conn.execute("DELETE FROM settings WHERE key = ?", ('last_upload_date',))
+        conn.commit()
+        flash('Library cleared. You can now upload a fresh CSV.')
     finally:
         conn.close()
     return redirect(url_for('library'))

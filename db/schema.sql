@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS titles (
     title_en TEXT,
     title_he TEXT,
     poster_path TEXT,
+    original_language TEXT,
     confidence REAL DEFAULT 1.0,
     match_status TEXT DEFAULT 'auto' CHECK(match_status IN ('auto', 'review', 'manual')),
     source TEXT DEFAULT 'csv' CHECK(source IN ('csv', 'manual')),
@@ -31,6 +32,8 @@ CREATE TABLE IF NOT EXISTS series_tracking (
     max_watched_season INTEGER,
     last_checked TIMESTAMP,
     status TEXT DEFAULT 'watching' CHECK(status IN ('watching', 'completed', 'dropped')),
+    next_season_air_date TEXT,
+    total_episodes_tmdb INTEGER,
     UNIQUE(title_id)
 );
 

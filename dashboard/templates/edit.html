@@ -1,77 +1,55 @@
 {% extends "base.html" %}
 {% set active_tab = "library" %}
 
-{% block title %}Edit — {{ title.title_he or title.title_en }}{% endblock %}
+{% block title %}Edit — {{ (title.title_en or title.title_he) if title.original_language != 'he' else (title.title_he or title.title_en) }}{% endblock %}
 
 {% block content %}
-<p class="section-label" dir="auto">Edit Title</p>
-
 <div class="edit-card">
-    <div style="display:flex;gap:1rem;align-items:start;">
+    <div class="edit-header">
         {% if title.poster_path %}
         <img src="https://image.tmdb.org/t/p/w200{{ title.poster_path }}"
-             alt="{{ title.title_he or title.title_en }}" dir="auto"
-             style="width:100px;min-width:100px;border-radius:6px;">
+             alt="{{ (title.title_en or title.title_he) if title.original_language != 'he' else (title.title_he or title.title_en) }}" dir="auto">
         {% endif %}
-        <div style="flex:1;">
-            <h3 dir="auto" style="margin-bottom:0.25rem;">{{ title.title_he or title.title_en }}</h3>
-            <p dir="auto" style="color:var(--popcorn-muted);margin:0;"><small dir="auto">{{ title.tmdb_type | upper }} &middot; TMDB ID: {{ title.tmdb_id }}</small></p>
+        <div>
+            <h3 dir="auto">{{ (title.title_en or title.title_he) if title.original_language != 'he' else (title.title_he or title.title_en) }}</h3>
+            <p class="edit-meta" dir="auto">{{ title.tmdb_type | upper }} · TMDB ID: {{ title.tmdb_id }}</p>
         </div>
     </div>
+
+    <form method="post" action="/edit/{{ title.id }}">
+        <div class="edit-section">
+            <h4 dir="auto">Change TMDB Match</h4>
+            <div style="position:relative;">
+                <input type="text" name="query" class="autocomplete-input"
+                       placeholder="Search for correct title..." dir="auto"
+                       autocomplete="off" minlength="3" style="margin:0;width:100%;">
+                <input type="hidden" name="new_tmdb_id" value="">
+                <input type="hidden" name="new_tmdb_type" value="">
+            </div>
+            <div class="autocomplete-results" dir="auto"></div>
+        </div>
+
+        {% if title.tmdb_type == 'tv' %}
+        <div class="edit-section">
+            <h4 dir="auto">Watched Seasons</h4>
+            <input type="number" id="watched_seasons" name="watched_seasons"
+                   min="0" max="{{ title.total_seasons_tmdb or 99 }}"
+                   value="{{ title.max_watched_season or 0 }}" style="width:100px;">
+        </div>
+        {% endif %}
+
+        <div class="edit-section">
+            <h4 dir="auto">Who Watched</h4>
+            <select name="user_tag" style="width:auto;">
+                <option value="both"{% if title.user_tag == 'both' %} selected{% endif %}>Both</option>
+                <option value="me"{% if title.user_tag == 'me' %} selected{% endif %}>Me</option>
+                <option value="wife"{% if title.user_tag == 'wife' %} selected{% endif %}>Wife</option>
+            </select>
+        </div>
+
+        <button type="submit" dir="auto">Save Changes</button>
+    </form>
 </div>
 
-<form method="post" action="/edit/{{ title.id }}" style="margin-top:1.5rem;">
-    <h4 dir="auto">Change TMDB Match</h4>
-    <fieldset role="group">
-        <input type="text" name="query" class="autocomplete-input"
-               placeholder="Search for correct title..." dir="auto"
-               autocomplete="off" minlength="3">
-        <input type="hidden" name="new_tmdb_id" value="">
-        <input type="hidden" name="new_tmdb_type" value="">
-    </fieldset>
-    <div class="autocomplete-results" dir="auto"></div>
-
-    {% if title.tmdb_type == 'tv' %}
-    <h4 dir="auto">Watched Seasons</h4>
-    <label for="watched_seasons" dir="auto">Seasons watched:</label>
-    <input type="number" id="watched_seasons" name="watched_seasons"
-           min="0" max="{{ title.total_seasons_tmdb or 99 }}"
-           value="{{ title.max_watched_season or 0 }}" style="width:120px;">
-    {% endif %}
-
-    <h4 dir="auto">Who Watched</h4>
-    <select name="user_tag" style="width:auto;">
-        <option value="both"{% if title.user_tag == 'both' %} selected{% endif %}>Both</option>
-        <option value="me"{% if title.user_tag == 'me' %} selected{% endif %}>Me</option>
-        <option value="wife"{% if title.user_tag == 'wife' %} selected{% endif %}>Wife</option>
-    </select>
-
-    <button type="submit" dir="auto" style="margin-top:1rem;">Save Changes</button>
-</form>
-
 <p style="margin-top:1rem;"><a href="/library" dir="auto">&larr; Back to Library</a></p>
-{% endblock %}
-
-{% block scripts %}
-<script>
-// Wire up autocomplete hidden fields for edit form (uses new_tmdb_id/new_tmdb_type)
-(function() {
-    var form = document.querySelector('form[action^="/edit/"]');
-    if (!form) return;
-    var input = form.querySelector('.autocomplete-input');
-    if (!input) return;
-
-    var origDropdown = input.parentNode.querySelector('div[style*="z-index"]');
-    if (origDropdown) {
-        var observer = new MutationObserver(function() {
-            var rows = origDropdown.querySelectorAll('div[style*="cursor"]');
-            rows.forEach(function(row) {
-                if (row._editHandlerAttached) return;
-                row._editHandlerAttached = true;
-            });
-        });
-        observer.observe(origDropdown, {childList: true});
-    }
-})();
-</script>
 {% endblock %}
