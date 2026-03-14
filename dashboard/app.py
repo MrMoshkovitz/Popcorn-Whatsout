@@ -86,7 +86,7 @@ def coming_soon():
         alerts_rows = conn.execute("""
             SELECT t.id, COALESCE(t.title_he, t.title_en) AS title,
                    t.poster_path, t.tmdb_id, t.tmdb_type,
-                   st.total_seasons_tmdb AS season_number
+                   st.max_watched_season, st.total_seasons_tmdb
             FROM series_tracking st
             JOIN titles t ON st.title_id = t.id
             WHERE st.status = ? AND st.total_seasons_tmdb > st.max_watched_season
@@ -100,10 +100,13 @@ def coming_soon():
                 FROM streaming_availability
                 WHERE tmdb_id = ? AND tmdb_type = ?
             """, (row['tmdb_id'], row['tmdb_type'])).fetchall()
+            new_season = (row['max_watched_season'] or 0) + 1
             alerts.append({
                 'title': row['title'],
                 'poster_path': row['poster_path'],
-                'season_number': row['season_number'],
+                'new_season': new_season,
+                'watched_season': row['max_watched_season'] or 0,
+                'total_seasons': row['total_seasons_tmdb'] or 0,
                 'providers': providers,
             })
 

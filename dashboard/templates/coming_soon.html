@@ -7,31 +7,34 @@
 <h2 dir="auto">Coming Soon</h2>
 
 {% if alerts %}
-<div class="grid">
-    {% for alert in alerts %}
-    <article>
+{% for alert in alerts %}
+<article>
+    <div style="display:flex;gap:1rem;align-items:start;">
         {% if alert.poster_path %}
         <img src="https://image.tmdb.org/t/p/w200{{ alert.poster_path }}"
              alt="{{ alert.title }}" dir="auto"
-             style="max-width: 200px;">
+             style="width:120px;min-width:120px;border-radius:4px;">
         {% endif %}
-        <header>
-            <h3 dir="auto">{{ alert.title }}</h3>
-            <p dir="auto"><mark dir="auto">Season {{ alert.season_number }} now available!</mark></p>
-        </header>
-        {% if alert.providers %}
-        <p dir="auto">
-            {% for provider in alert.providers %}
-            <img src="https://image.tmdb.org/t/p/original{{ provider.provider_logo_path }}"
-                 alt="{{ provider.provider_name }}" dir="auto"
-                 title="{{ provider.provider_name }} ({{ provider.monetization_type }})"
-                 style="height: 24px; vertical-align: middle; margin-right: 4px;">
-            {% endfor %}
-        </p>
-        {% endif %}
-    </article>
-    {% endfor %}
-</div>
+        <div>
+            <h3 dir="auto" style="margin-bottom:0.25rem;">{{ alert.title }}</h3>
+            <p dir="auto"><mark dir="auto">Season {{ alert.new_season }} available!</mark></p>
+            <p dir="auto"><small dir="auto">You watched up to Season {{ alert.watched_season }}{% if alert.total_seasons > alert.new_season %} &middot; {{ alert.total_seasons }} seasons total{% endif %}</small></p>
+            {% if alert.providers %}
+            <p dir="auto">
+                {% for provider in alert.providers %}
+                {% if provider.provider_logo_path %}
+                <img src="https://image.tmdb.org/t/p/original{{ provider.provider_logo_path }}"
+                     alt="{{ provider.provider_name }}" dir="auto"
+                     title="{{ provider.provider_name }} ({{ provider.monetization_type }})"
+                     style="height:24px;vertical-align:middle;margin-right:4px;border-radius:4px;">
+                {% endif %}
+                {% endfor %}
+            </p>
+            {% endif %}
+        </div>
+    </div>
+</article>
+{% endfor %}
 {% else %}
 <p dir="auto">All caught up! No new seasons detected.</p>
 {% endif %}
