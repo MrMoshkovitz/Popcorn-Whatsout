@@ -78,6 +78,21 @@
                                         var typeField = form.querySelector('[name="tmdb_type"]');
                                         if (idField) idField.value = item.tmdb_id;
                                         if (typeField) typeField.value = item.media_type;
+
+                                        // Show/hide seasons input for TV shows
+                                        var seasonsDiv = form.querySelector('#seasons-input');
+                                        var seasonsField = form.querySelector('#watched_seasons');
+                                        if (seasonsDiv && seasonsField) {
+                                            if (item.media_type === 'tv') {
+                                                var maxS = item.number_of_seasons || 1;
+                                                seasonsField.max = maxS;
+                                                seasonsField.value = maxS;
+                                                seasonsDiv.style.display = 'block';
+                                            } else {
+                                                seasonsDiv.style.display = 'none';
+                                                seasonsField.value = '';
+                                            }
+                                        }
                                     }
                                     dropdown.style.display = 'none';
                                 });

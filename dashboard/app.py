@@ -267,13 +267,16 @@ def search():
             continue
         title = r.get('name') or r.get('title', '')
         year = (r.get('first_air_date') or r.get('release_date') or '')[:4]
-        items.append({
+        item = {
             'tmdb_id': r['id'],
             'media_type': r['media_type'],
             'title': title,
             'year': year,
             'poster_path': r.get('poster_path'),
-        })
+        }
+        if r.get('media_type') == 'tv':
+            item['number_of_seasons'] = r.get('number_of_seasons')
+        items.append(item)
         if len(items) >= 5:
             break
     return jsonify(items)
@@ -315,11 +318,15 @@ def add():
 
         if tmdb_type == 'tv':
             num_seasons = (details_en or details_he or {}).get('number_of_seasons', 1)
+            watched_seasons = request.form.get('watched_seasons', type=int)
+            if watched_seasons is None or watched_seasons < 0:
+                watched_seasons = num_seasons
+            watched_seasons = min(watched_seasons, num_seasons)
             conn.execute("""
                 INSERT OR REPLACE INTO series_tracking
                 (title_id, tmdb_id, max_watched_season, total_seasons_tmdb, status)
                 VALUES (?, ?, ?, ?, 'watching')
-            """, (title_id, tmdb_id, num_seasons, num_seasons))
+            """, (title_id, tmdb_id, watched_seasons, num_seasons))
 
         conn.commit()
 
