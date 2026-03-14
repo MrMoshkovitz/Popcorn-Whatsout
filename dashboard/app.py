@@ -313,8 +313,12 @@ def upload():
         )
         conn.commit()
 
-        flash(f"Upload complete: {stats.get('matched', 0)} matched, "
-              f"{stats.get('review', 0)} need review, "
+        new_titles = stats.get('matched', 0) + stats.get('review', 0)
+        skipped = stats.get('skipped', 0)
+        new_eps = stats.get('new_episodes', 0)
+        flash(f"Upload complete: {new_titles} new titles, "
+              f"{skipped} already in library, "
+              f"{new_eps} new episodes added, "
               f"{stats.get('errors', 0)} errors, "
               f"{rec_count} recommendations generated.")
         return redirect(url_for('library'))

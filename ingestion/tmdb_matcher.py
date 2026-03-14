@@ -66,7 +66,7 @@ def _match_single(parsed_name: str, media_type_hint: str) -> dict:
 
 def match_entries(entries: list[dict], conn: sqlite3.Connection, user_tag: str = 'both') -> dict:
     """Match parsed entries to TMDB. Returns stats dict {matched, review, errors}."""
-    stats = {"matched": 0, "review": 0, "errors": 0}
+    stats = {"matched": 0, "review": 0, "errors": 0, "skipped": 0, "new_episodes": 0}
 
     if not entries:
         return stats
@@ -101,15 +101,27 @@ def match_entries(entries: list[dict], conn: sqlite3.Connection, user_tag: str =
 
     cursor = conn.cursor()
 
-    # Step 3: Upsert matched titles into titles table
+    # Step 3: Insert new titles, skip existing ones to preserve manual edits
     title_id_lookup = {}
     for name, match in matches.items():
         if match["tmdb_id"] is None:
             stats["review"] += 1
             continue
 
+        # Check if title already exists
+        existing = cursor.execute(
+            "SELECT id, match_status, user_tag FROM titles WHERE tmdb_id = ? AND tmdb_type = ?",
+            (match["tmdb_id"], match["tmdb_type"]),
+        ).fetchone()
+
+        if existing:
+            title_id_lookup[name] = existing[0] if not isinstance(existing, sqlite3.Row) else existing["id"]
+            stats["skipped"] += 1
+            continue
+
+        # Insert new title (not INSERT OR REPLACE)
         cursor.execute(
-            """INSERT OR REPLACE INTO titles
+            """INSERT INTO titles
                (tmdb_id, tmdb_type, title_en, title_he, poster_path, original_language, confidence, match_status, source, user_tag)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'csv', ?)""",
             (match["tmdb_id"], match["tmdb_type"], match["title_en"],
@@ -131,7 +143,7 @@ def match_entries(entries: list[dict], conn: sqlite3.Connection, user_tag: str =
         else:
             stats["review"] += 1
 
-    # Step 4: Insert all entries into watch_history
+    # Step 4: Insert new watch_history entries (IGNORE duplicates)
     for entry in entries:
         name = entry["parsed_name"]
         title_id = title_id_lookup.get(name)
@@ -140,12 +152,14 @@ def match_entries(entries: list[dict], conn: sqlite3.Connection, user_tag: str =
 
         try:
             cursor.execute(
-                """INSERT OR REPLACE INTO watch_history
+                """INSERT OR IGNORE INTO watch_history
                    (title_id, raw_csv_title, watch_date, season_number, episode_name)
                    VALUES (?, ?, ?, ?, ?)""",
                 (title_id, entry["title"], entry["watch_date"],
                  entry.get("season_number"), entry.get("episode_name")),
             )
+            if cursor.rowcount > 0:
+                stats["new_episodes"] += 1
         except Exception as e:
             logger.warning(f"Failed to insert watch_history for '{name}': {e}")
 
@@ -180,14 +194,29 @@ def match_entries(entries: list[dict], conn: sqlite3.Connection, user_tag: str =
                         next_air_date = s.get("air_date")
                         break
 
-        cursor.execute(
-            """INSERT OR IGNORE INTO series_tracking
-               (title_id, tmdb_id, total_seasons_tmdb, max_watched_season,
-                next_season_air_date, total_episodes_tmdb, status)
-               VALUES (?, ?, ?, ?, ?, ?, 'watching')""",
-            (title_id, match["tmdb_id"], total_seasons, max_season,
-             next_air_date, total_episodes),
-        )
+        existing_tracking = cursor.execute(
+            "SELECT max_watched_season FROM series_tracking WHERE title_id = ?",
+            (title_id,)
+        ).fetchone()
+
+        if existing_tracking:
+            # Update only if CSV shows a higher season
+            existing_max = existing_tracking[0] if not isinstance(existing_tracking, sqlite3.Row) else existing_tracking["max_watched_season"]
+            if max_season and (existing_max is None or max_season > existing_max):
+                cursor.execute(
+                    "UPDATE series_tracking SET max_watched_season = ?, total_seasons_tmdb = ?, "
+                    "next_season_air_date = ?, total_episodes_tmdb = ? WHERE title_id = ?",
+                    (max_season, total_seasons, next_air_date, total_episodes, title_id),
+                )
+        else:
+            cursor.execute(
+                """INSERT INTO series_tracking
+                   (title_id, tmdb_id, total_seasons_tmdb, max_watched_season,
+                    next_season_air_date, total_episodes_tmdb, status)
+                   VALUES (?, ?, ?, ?, ?, ?, 'watching')""",
+                (title_id, match["tmdb_id"], total_seasons, max_season,
+                 next_air_date, total_episodes),
+            )
 
     # Step 6: Commit once
     conn.commit()
