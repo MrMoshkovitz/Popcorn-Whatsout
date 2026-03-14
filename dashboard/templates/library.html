@@ -4,9 +4,8 @@
 {% block title %}Library{% endblock %}
 
 {% block content %}
-<h2 dir="auto">Library</h2>
-
 {% if titles %}
+<p class="section-label" dir="auto">Your Library</p>
 <table role="grid">
     <thead>
         <tr>
@@ -25,35 +24,37 @@
             <td>
                 {% if title.poster_path %}
                 <img src="https://image.tmdb.org/t/p/w200{{ title.poster_path }}"
-                     alt="{{ title.title_he or title.title_en }}" dir="auto"
-                     style="max-width: 60px;">
+                     alt="{{ title.title_he or title.title_en }}" dir="auto">
                 {% endif %}
             </td>
             <td dir="auto">{{ title.title_he or title.title_en }}</td>
-            <td dir="auto"><small dir="auto">{{ title.tmdb_type }}</small></td>
+            <td dir="auto"><span class="type-badge">{{ title.tmdb_type }}</span></td>
             <td dir="auto"><span class="tag-badge tag-{{ title.user_tag or 'both' }}">{{ title.user_tag or 'both' }}</span></td>
             <td dir="auto">{{ title.watch_count }}</td>
             <td dir="auto">{{ title.last_watched }}</td>
             <td>
-                <a href="/edit/{{ title.id }}" role="button" class="outline secondary"
-                   style="padding:2px 8px;font-size:0.75em;">Edit</a>
-                <form method="post" action="/delete/{{ title.id }}" style="display:inline;"
-                      onsubmit="return confirm('Delete this title and all related data?')">
-                    <button type="submit" class="outline secondary"
-                            style="padding:2px 8px;font-size:0.75em;">Delete</button>
-                </form>
+                <div class="action-group">
+                    <a href="/edit/{{ title.id }}" role="button" class="outline secondary">Edit</a>
+                    <form method="post" action="/delete/{{ title.id }}"
+                          onsubmit="return confirm('Delete this title and all related data?')">
+                        <button type="submit" class="outline secondary">Delete</button>
+                    </form>
+                </div>
             </td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
 {% else %}
-<p dir="auto">Your library is empty. Upload your Netflix viewing history to get started!</p>
+<div class="empty-state">
+    <div class="icon">&#128218;</div>
+    <p dir="auto">Your library is empty. Upload your Netflix viewing history to get started!</p>
+</div>
 {% endif %}
 
 <hr>
 
-<h3 dir="auto">Upload Netflix CSV</h3>
+<p class="section-label" dir="auto">Upload Netflix CSV</p>
 <form method="post" action="/upload" enctype="multipart/form-data">
     <label for="upload_user_tag" dir="auto">Whose history?</label>
     <select name="user_tag" id="upload_user_tag" style="width:auto;display:inline-block;margin-bottom:0.5rem;">
@@ -69,7 +70,7 @@
 
 <hr>
 
-<h3 dir="auto">Add a Title</h3>
+<p class="section-label" dir="auto">Add a Title</p>
 <form method="post" action="/add" id="add-form">
     <fieldset role="group">
         <input type="text" name="query" class="autocomplete-input"

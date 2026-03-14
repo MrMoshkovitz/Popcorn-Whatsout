@@ -4,23 +4,23 @@
 {% block title %}Edit — {{ title.title_he or title.title_en }}{% endblock %}
 
 {% block content %}
-<h2 dir="auto">Edit Title</h2>
+<p class="section-label" dir="auto">Edit Title</p>
 
-<article>
+<div class="edit-card">
     <div style="display:flex;gap:1rem;align-items:start;">
         {% if title.poster_path %}
         <img src="https://image.tmdb.org/t/p/w200{{ title.poster_path }}"
              alt="{{ title.title_he or title.title_en }}" dir="auto"
-             style="width:120px;min-width:120px;border-radius:4px;">
+             style="width:100px;min-width:100px;border-radius:6px;">
         {% endif %}
         <div style="flex:1;">
-            <h3 dir="auto">{{ title.title_he or title.title_en }}</h3>
-            <p dir="auto"><small dir="auto">{{ title.tmdb_type | upper }} &middot; TMDB ID: {{ title.tmdb_id }}</small></p>
+            <h3 dir="auto" style="margin-bottom:0.25rem;">{{ title.title_he or title.title_en }}</h3>
+            <p dir="auto" style="color:var(--popcorn-muted);margin:0;"><small dir="auto">{{ title.tmdb_type | upper }} &middot; TMDB ID: {{ title.tmdb_id }}</small></p>
         </div>
     </div>
-</article>
+</div>
 
-<form method="post" action="/edit/{{ title.id }}">
+<form method="post" action="/edit/{{ title.id }}" style="margin-top:1.5rem;">
     <h4 dir="auto">Change TMDB Match</h4>
     <fieldset role="group">
         <input type="text" name="query" class="autocomplete-input"
@@ -46,10 +46,10 @@
         <option value="wife"{% if title.user_tag == 'wife' %} selected{% endif %}>Wife</option>
     </select>
 
-    <button type="submit" dir="auto">Save Changes</button>
+    <button type="submit" dir="auto" style="margin-top:1rem;">Save Changes</button>
 </form>
 
-<p><a href="/library" dir="auto">&larr; Back to Library</a></p>
+<p style="margin-top:1rem;"><a href="/library" dir="auto">&larr; Back to Library</a></p>
 {% endblock %}
 
 {% block scripts %}
@@ -61,7 +61,6 @@
     var input = form.querySelector('.autocomplete-input');
     if (!input) return;
 
-    // Override the default click handler to set new_tmdb_id instead of tmdb_id
     var origDropdown = input.parentNode.querySelector('div[style*="z-index"]');
     if (origDropdown) {
         var observer = new MutationObserver(function() {

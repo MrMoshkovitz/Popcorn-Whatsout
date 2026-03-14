@@ -3,13 +3,13 @@
 {% block title %}Review Matches{% endblock %}
 
 {% block content %}
-<h2 dir="auto">Review Matches</h2>
+<p class="section-label" dir="auto">Review Matches</p>
 
 {% if review_items %}
-<p dir="auto">These titles had low confidence matches. Please confirm or correct them.</p>
+<p dir="auto" style="color:var(--popcorn-muted);">These titles had low confidence matches. Please confirm or correct them.</p>
 
 {% for item in review_items %}
-<article>
+<div class="review-card">
     <header>
         <h3 dir="auto">{{ item.raw_title }}</h3>
         <p dir="auto"><small dir="auto">Confidence: {{ "%.0f"|format(item.confidence * 100) }}%</small></p>
@@ -21,10 +21,10 @@
             {% if item.poster_path %}
             <img src="https://image.tmdb.org/t/p/w200{{ item.poster_path }}"
                  alt="{{ item.title_he or item.title_en }}" dir="auto"
-                 style="max-width: 200px;">
+                 style="max-width: 160px; border-radius: 6px;">
             {% endif %}
             <p dir="auto">{{ item.title_he or item.title_en }}</p>
-            <p dir="auto"><small dir="auto">{{ item.tmdb_type }} — TMDB ID: {{ item.tmdb_id }}</small></p>
+            <p dir="auto"><small dir="auto" style="color:var(--popcorn-muted);">{{ item.tmdb_type }} — TMDB ID: {{ item.tmdb_id }}</small></p>
 
             <form method="post" action="/resolve/{{ item.id }}">
                 <input type="hidden" name="tmdb_id" value="{{ item.tmdb_id }}">
@@ -40,18 +40,21 @@
                     <input type="text" name="query" class="autocomplete-input"
                            placeholder="Search TMDB..." dir="auto"
                            autocomplete="off" minlength="3">
-                    <input type="hidden" name="tmdb_id" value="">
-                    <input type="hidden" name="tmdb_type" value="">
+                    <input type="hidden" name="new_tmdb_id" value="">
+                    <input type="hidden" name="new_tmdb_type" value="">
                     <button type="submit" dir="auto">Use This</button>
                 </fieldset>
                 <div class="autocomplete-results" dir="auto"></div>
             </form>
         </div>
     </div>
-</article>
+</div>
 {% endfor %}
 
 {% else %}
-<p dir="auto">All titles matched! Nothing to review.</p>
+<div class="empty-state">
+    <div class="icon">&#9989;</div>
+    <p dir="auto">All titles matched! Nothing to review.</p>
+</div>
 {% endif %}
 {% endblock %}

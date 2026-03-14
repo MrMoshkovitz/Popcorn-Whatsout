@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html dir="auto" lang="he">
+<html dir="auto" lang="he" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,7 +11,7 @@
     <header class="container">
         <nav>
             <ul>
-                <li><strong dir="auto">Popcorn</strong></li>
+                <li><strong class="brand" dir="auto"><span>Popcorn</span></strong></li>
             </ul>
             <ul>
                 <li><a href="/watch-next" dir="auto" {% if active_tab == 'watch-next' %}aria-current="page"{% endif %}>Watch Next</a></li>
@@ -28,7 +28,7 @@
         {% with messages = get_flashed_messages() %}
         {% if messages %}
         {% for message in messages %}
-        <p dir="auto" role="alert">{{ message }}</p>
+        <div class="flash-msg" dir="auto" role="alert">{{ message }}</div>
         {% endfor %}
         {% endif %}
         {% endwith %}
@@ -60,7 +60,7 @@
         inputs.forEach(function(input) {
             var timer = null;
             var dropdown = document.createElement('div');
-            dropdown.style.cssText = 'position:absolute;background:var(--pico-card-background-color,#fff);border:1px solid var(--pico-muted-border-color,#ccc);z-index:100;max-height:300px;overflow-y:auto;display:none;width:100%';
+            dropdown.style.cssText = 'position:absolute;background:var(--popcorn-card-bg,#1e2030);border:1px solid #2a2d42;border-radius:8px;z-index:100;max-height:300px;overflow-y:auto;display:none;width:100%';
             input.parentNode.style.position = 'relative';
             input.parentNode.appendChild(dropdown);
 
@@ -76,10 +76,12 @@
                             if (!items.length) { dropdown.style.display = 'none'; return; }
                             items.forEach(function(item) {
                                 var row = document.createElement('div');
-                                row.style.cssText = 'padding:0.5em;cursor:pointer;display:flex;align-items:center;gap:0.5em';
-                                var img = item.poster_path ? '<img src="https://image.tmdb.org/t/p/w200' + item.poster_path + '" alt="" style="height:40px;width:27px;object-fit:cover">' : '';
+                                row.style.cssText = 'padding:0.5em 0.75em;cursor:pointer;display:flex;align-items:center;gap:0.6em;border-bottom:1px solid #2a2d42;transition:background 0.1s';
+                                row.onmouseover = function() { row.style.background = '#262840'; };
+                                row.onmouseout = function() { row.style.background = 'transparent'; };
+                                var img = item.poster_path ? '<img src="https://image.tmdb.org/t/p/w200' + item.poster_path + '" alt="" style="height:40px;width:27px;object-fit:cover;border-radius:3px">' : '';
                                 var badge = item.media_type === 'tv' ? 'TV' : 'Movie';
-                                row.innerHTML = img + '<span dir="auto">' + item.title + ' (' + (item.year || '?') + ') <small>[' + badge + ']</small></span>';
+                                row.innerHTML = img + '<span dir="auto">' + item.title + ' (' + (item.year || '?') + ') <small style="opacity:0.6">[' + badge + ']</small></span>';
                                 row.addEventListener('click', function() {
                                     input.value = item.title;
                                     var form = input.closest('form');
