@@ -4,6 +4,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from flask import Flask, render_template, redirect, url_for, request, flash, jsonify
 import sqlite3
+import logging
 import tempfile
 import os as _os
 from datetime import datetime, timedelta
@@ -11,6 +12,9 @@ from config import DB_PATH
 from ingestion.csv_parser import parse_netflix_csv
 from ingestion.tmdb_matcher import match_entries
 from ingestion.tmdb_api import tmdb_get
+from engine.recommendations import generate_recommendations, generate_all_recommendations
+
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.secret_key = _os.urandom(24)
@@ -192,6 +196,14 @@ def upload():
 
         stats = match_entries(entries, conn)
 
+        # Generate recommendations for all matched titles
+        try:
+            rec_stats = generate_all_recommendations(conn)
+            rec_count = rec_stats.get('total_recs', 0)
+        except Exception as e:
+            logger.warning(f"Recommendation generation failed: {e}")
+            rec_count = 0
+
         # Update last upload timestamp
         conn.execute(
             "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
@@ -201,7 +213,8 @@ def upload():
 
         flash(f"Upload complete: {stats.get('matched', 0)} matched, "
               f"{stats.get('review', 0)} need review, "
-              f"{stats.get('errors', 0)} errors.")
+              f"{stats.get('errors', 0)} errors, "
+              f"{rec_count} recommendations generated.")
         return redirect(url_for('library'))
     finally:
         conn.close()
@@ -250,8 +263,8 @@ def add():
     try:
         conn.execute("""
             INSERT OR REPLACE INTO titles
-            (tmdb_id, tmdb_type, title_he, title_en, poster_path, match_status, confidence)
-            VALUES (?, ?, ?, ?, ?, 'manual', 1.0)
+            (tmdb_id, tmdb_type, title_he, title_en, poster_path, match_status, confidence, source)
+            VALUES (?, ?, ?, ?, ?, 'manual', 1.0, 'manual')
         """, (
             tmdb_id, tmdb_type,
             (details_he or {}).get('title') or (details_he or {}).get('name'),
@@ -259,19 +272,32 @@ def add():
             (details_he or details_en or {}).get('poster_path'),
         ))
 
+        # Get the title_id for recommendation generation
+        row = conn.execute(
+            "SELECT id FROM titles WHERE tmdb_id = ? AND tmdb_type = ?",
+            (tmdb_id, tmdb_type)
+        ).fetchone()
+        if row is None:
+            flash('Failed to add title — please try again.')
+            return redirect(url_for('library'))
+        title_id = row['id']
+
         if tmdb_type == 'tv':
-            title_id = conn.execute(
-                "SELECT id FROM titles WHERE tmdb_id = ? AND tmdb_type = ?",
-                (tmdb_id, tmdb_type)
-            ).fetchone()['id']
             num_seasons = (details_en or details_he or {}).get('number_of_seasons', 1)
             conn.execute("""
                 INSERT OR REPLACE INTO series_tracking
-                (title_id, max_watched_season, total_seasons_tmdb, status)
-                VALUES (?, ?, ?, 'watching')
-            """, (title_id, num_seasons, num_seasons))
+                (title_id, tmdb_id, max_watched_season, total_seasons_tmdb, status)
+                VALUES (?, ?, ?, ?, 'watching')
+            """, (title_id, tmdb_id, num_seasons, num_seasons))
 
         conn.commit()
+
+        # Generate recommendations for this title
+        try:
+            generate_recommendations(conn, tmdb_id, tmdb_type, title_id)
+        except Exception as e:
+            logger.warning(f"Recommendation generation failed for added title: {e}")
+
         flash('Title added to library.')
     finally:
         conn.close()
