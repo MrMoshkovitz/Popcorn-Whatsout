@@ -72,8 +72,36 @@ def watch_next():
                 'providers': providers,
             })
 
+        # Season gaps: series where user hasn't finished all available seasons
+        continue_rows = conn.execute("""
+            SELECT t.id, COALESCE(t.title_he, t.title_en) AS title,
+                   t.poster_path, t.tmdb_id, t.tmdb_type,
+                   st.max_watched_season, st.total_seasons_tmdb
+            FROM series_tracking st
+            JOIN titles t ON st.title_id = t.id
+            WHERE st.status = ? AND st.total_seasons_tmdb > st.max_watched_season
+            ORDER BY t.title_en
+        """, ('watching',)).fetchall()
+
+        continue_watching = []
+        for row in continue_rows:
+            providers = conn.execute("""
+                SELECT provider_name, provider_logo_path, monetization_type
+                FROM streaming_availability
+                WHERE tmdb_id = ? AND tmdb_type = ?
+            """, (row['tmdb_id'], row['tmdb_type'])).fetchall()
+            next_season = (row['max_watched_season'] or 0) + 1
+            continue_watching.append({
+                'title': row['title'],
+                'poster_path': row['poster_path'],
+                'next_season': next_season,
+                'total_seasons': row['total_seasons_tmdb'] or 0,
+                'providers': providers,
+            })
+
         return render_template('watch_next.html',
                                recommendations=recs_with_providers,
+                               continue_watching=continue_watching,
                                review_count=get_review_count())
     finally:
         conn.close()

@@ -6,7 +6,42 @@
 {% block content %}
 <h2 dir="auto">Watch Next</h2>
 
+{% if continue_watching %}
+<h3 dir="auto">Continue Watching</h3>
+{% for item in continue_watching %}
+<article>
+    <div style="display:flex;gap:1rem;align-items:start;">
+        {% if item.poster_path %}
+        <img src="https://image.tmdb.org/t/p/w200{{ item.poster_path }}"
+             alt="{{ item.title }}" dir="auto"
+             style="width:120px;min-width:120px;border-radius:4px;">
+        {% endif %}
+        <div>
+            <h4 dir="auto" style="margin-bottom:0.25rem;">{{ item.title }}</h4>
+            <p dir="auto"><mark dir="auto">Season {{ item.next_season }} available!</mark></p>
+            {% if item.total_seasons > item.next_season %}
+            <p dir="auto"><small dir="auto">{{ item.total_seasons }} seasons total</small></p>
+            {% endif %}
+            {% if item.providers %}
+            <p dir="auto">
+                {% for provider in item.providers %}
+                {% if provider.provider_logo_path %}
+                <img src="https://image.tmdb.org/t/p/original{{ provider.provider_logo_path }}"
+                     alt="{{ provider.provider_name }}" dir="auto"
+                     title="{{ provider.provider_name }} ({{ provider.monetization_type }})"
+                     style="height:24px;vertical-align:middle;margin-right:4px;border-radius:4px;">
+                {% endif %}
+                {% endfor %}
+            </p>
+            {% endif %}
+        </div>
+    </div>
+</article>
+{% endfor %}
+{% endif %}
+
 {% if recommendations %}
+<h3 dir="auto">Recommended For You</h3>
 <div class="grid">
     {% for rec in recommendations %}
     <article>
@@ -22,10 +57,12 @@
         {% if rec.providers %}
         <p dir="auto">
             {% for provider in rec.providers %}
+            {% if provider.provider_logo_path %}
             <img src="https://image.tmdb.org/t/p/original{{ provider.provider_logo_path }}"
                  alt="{{ provider.provider_name }}" dir="auto"
                  title="{{ provider.provider_name }} ({{ provider.monetization_type }})"
                  style="height: 24px; vertical-align: middle; margin-right: 4px;">
+            {% endif %}
             {% endfor %}
         </p>
         {% endif %}
@@ -37,7 +74,9 @@
     </article>
     {% endfor %}
 </div>
-{% else %}
+{% endif %}
+
+{% if not recommendations and not continue_watching %}
 <p dir="auto">No recommendations yet. Upload your Netflix history to get started!</p>
 {% endif %}
 {% endblock %}
