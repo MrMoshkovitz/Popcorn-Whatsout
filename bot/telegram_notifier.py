@@ -7,7 +7,7 @@ import sqlite3
 from datetime import datetime
 
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import Application, CallbackQueryHandler, ContextTypes
+from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ContextTypes
 import telegram.error
 
 from config import TELEGRAM_BOT_TOKEN, TELEGRAM_ADMIN_CHAT_ID, DB_PATH
@@ -104,6 +104,43 @@ async def send_admin_alert(bot, chat_id, error_message):
         logger.error(f"Failed to send admin alert: {e}")
 
 
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /start — store chat_id for notifications."""
+    chat_id = str(update.effective_chat.id)
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        conn.execute(
+            "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+            ('telegram_chat_id', chat_id)
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    await update.message.reply_text(
+        "Connected! You'll get notifications for new seasons and recommendations."
+    )
+
+
+async def recommendations_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /recommendations — show top unseen recommendations."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    try:
+        recs = conn.execute(
+            "SELECT recommended_title FROM recommendations "
+            "WHERE status = 'unseen' ORDER BY created_at DESC LIMIT 5"
+        ).fetchall()
+        if recs:
+            text = "Top recommendations:\n" + "\n".join(
+                f"- {r['recommended_title']}" for r in recs
+            )
+        else:
+            text = "No recommendations yet. Upload your Netflix history on the dashboard!"
+        await update.message.reply_text(text)
+    finally:
+        conn.close()
+
+
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle all inline keyboard callbacks."""
     query = update.callback_query
@@ -163,6 +200,8 @@ def run_bot():
         logger.warning("No TELEGRAM_BOT_TOKEN set, bot not starting")
         return
     application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+    application.add_handler(CommandHandler("start", start_command))
+    application.add_handler(CommandHandler("recommendations", recommendations_command))
     application.add_handler(CallbackQueryHandler(handle_callback))
     application.add_error_handler(error_handler)
     application.run_polling()

@@ -45,12 +45,13 @@ def _run_phase_1_new_seasons(consecutive_errors):
             alerts = check_new_seasons(conn)
             if alerts:
                 from bot.telegram_notifier import send_new_season_alert, bot
-                if bot and TELEGRAM_ADMIN_CHAT_ID:
+                chat_id = _get_chat_id()
+                if bot and chat_id:
                     for alert in alerts:
                         title_name = alert.get('title_he') or alert.get('title_en') or 'Unknown'
                         try:
                             asyncio.run(send_new_season_alert(
-                                bot, TELEGRAM_ADMIN_CHAT_ID,
+                                bot, chat_id,
                                 title_name, alert['new_season'],
                                 tmdb_id=alert.get('tmdb_id')
                             ))
@@ -152,12 +153,31 @@ def _run_phase_5_error_check(consecutive_errors):
         logging.warning(f"Admin alert: {error_msg}")
         try:
             from bot.telegram_notifier import send_admin_alert, bot
-            if bot and TELEGRAM_ADMIN_CHAT_ID:
-                asyncio.run(send_admin_alert(bot, TELEGRAM_ADMIN_CHAT_ID, error_msg))
+            chat_id = _get_chat_id()
+            if bot and chat_id:
+                asyncio.run(send_admin_alert(bot, chat_id, error_msg))
         except Exception as e:
             logging.error(f"Phase 5: Failed to send admin alert: {e}")
     else:
         logging.info(f"Phase 5 complete: {consecutive_errors} errors (below threshold)")
+
+
+def _get_chat_id():
+    """Get Telegram chat ID from DB settings, falling back to env var."""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        try:
+            row = conn.execute(
+                "SELECT value FROM settings WHERE key = ?", ('telegram_chat_id',)
+            ).fetchone()
+            if row and row['value']:
+                return row['value']
+        finally:
+            conn.close()
+    except Exception:
+        pass
+    return TELEGRAM_ADMIN_CHAT_ID
 
 
 def daily_check():

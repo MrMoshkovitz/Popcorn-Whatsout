@@ -61,9 +61,21 @@ def tag_filter_sql(table_alias='t'):
 
 
 @app.context_processor
-def inject_tag():
-    """Make active_tag available in all templates."""
-    return {'active_tag': get_active_tag()}
+def inject_globals():
+    """Make active_tag and telegram status available in all templates."""
+    telegram_connected = False
+    try:
+        conn = get_db()
+        try:
+            row = conn.execute(
+                "SELECT value FROM settings WHERE key = ?", ('telegram_chat_id',)
+            ).fetchone()
+            telegram_connected = bool(row and row['value'])
+        finally:
+            conn.close()
+    except Exception:
+        pass
+    return {'active_tag': get_active_tag(), 'telegram_connected': telegram_connected}
 
 
 @app.route('/')
