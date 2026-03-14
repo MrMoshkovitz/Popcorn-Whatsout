@@ -13,6 +13,11 @@
         <button class="filter-pill" data-filter="tv">TV</button>
         <button class="filter-pill" data-filter="movie">Movie</button>
     </div>
+    <div class="filter-pills" id="lib-tag-filter">
+        <button class="filter-pill active" data-filter="all">All</button>
+        <button class="filter-pill" data-filter="me">Me</button>
+        <button class="filter-pill" data-filter="wife">Wife</button>
+    </div>
     <select class="filter-sort" id="lib-sort">
         <option value="recent">Last watched</option>
         <option value="title">Title A-Z</option>
@@ -163,10 +168,12 @@
     var grid = document.getElementById('lib-grid');
     var searchInput = document.getElementById('lib-search');
     var typeFilter = document.getElementById('lib-type-filter');
+    var tagFilter = document.getElementById('lib-tag-filter');
     var sortSelect = document.getElementById('lib-sort');
     if (!grid) return;
 
     var activeType = 'all';
+    var activeTag = 'all';
 
     function applyFilters() {
         var query = (searchInput ? searchInput.value : '').toLowerCase();
@@ -174,9 +181,11 @@
         cards.forEach(function(card) {
             var title = (card.getAttribute('data-title') || '').toLowerCase();
             var type = card.getAttribute('data-type') || '';
+            var tag = card.getAttribute('data-tag') || 'both';
             var matchSearch = !query || title.indexOf(query) !== -1;
             var matchType = activeType === 'all' || type === activeType;
-            card.style.display = (matchSearch && matchType) ? '' : 'none';
+            var matchTag = activeTag === 'all' || tag === activeTag || tag === 'both';
+            card.style.display = (matchSearch && matchType && matchTag) ? '' : 'none';
         });
     }
 
@@ -207,6 +216,16 @@
             typeFilter.querySelectorAll('.filter-pill').forEach(function(b) { b.classList.remove('active'); });
             btn.classList.add('active');
             activeType = btn.getAttribute('data-filter');
+            applyFilters();
+        });
+    }
+    if (tagFilter) {
+        tagFilter.addEventListener('click', function(e) {
+            var btn = e.target.closest('.filter-pill');
+            if (!btn) return;
+            tagFilter.querySelectorAll('.filter-pill').forEach(function(b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            activeTag = btn.getAttribute('data-filter');
             applyFilters();
         });
     }

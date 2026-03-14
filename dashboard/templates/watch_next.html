@@ -11,9 +11,9 @@
 
 {% if continue_watching %}
 <h2 class="section-title" dir="auto">Continue Watching</h2>
-<div class="scroll-row">
+<div class="scroll-row" id="cw-row">
     {% for item in continue_watching %}
-    <div class="poster-card">
+    <div class="poster-card" data-title="{{ item.title }}" data-tag="{{ item.user_tag }}">
         {% if item.poster_path %}
         <img class="poster-img" src="https://image.tmdb.org/t/p/w300{{ item.poster_path }}"
              alt="{{ item.title }}" dir="auto">
@@ -49,10 +49,24 @@
 <h2 class="section-title" dir="auto">Recommended For You</h2>
 <div class="filter-bar" dir="auto">
     <input type="text" class="filter-search" id="rec-search" placeholder="Search recommendations..." dir="auto">
+    <div class="filter-pills" id="rec-type-filter">
+        <button class="filter-pill active" data-filter="all">All</button>
+        <button class="filter-pill" data-filter="tv">TV</button>
+        <button class="filter-pill" data-filter="movie">Movie</button>
+    </div>
+    <div class="filter-pills" id="rec-tag-filter">
+        <button class="filter-pill active" data-filter="all">All</button>
+        <button class="filter-pill" data-filter="me">Me</button>
+        <button class="filter-pill" data-filter="wife">Wife</button>
+    </div>
 </div>
 <div class="poster-grid" id="rec-grid">
     {% for rec in recommendations %}
-    <div class="poster-card" data-title="{{ rec.recommended_title }}" data-source="{{ rec.source_title }}">
+    <div class="poster-card"
+         data-title="{{ rec.recommended_title }}"
+         data-source="{{ rec.source_title }}"
+         data-type="{{ rec.recommended_type }}"
+         data-tag="{{ rec.source_tag }}">
         {% if rec.poster_path %}
         <img class="poster-img" src="https://image.tmdb.org/t/p/w300{{ rec.poster_path }}"
              alt="{{ rec.recommended_title }}" dir="auto">
@@ -97,15 +111,43 @@
 (function() {
     var grid = document.getElementById('rec-grid');
     var searchInput = document.getElementById('rec-search');
-    if (!grid || !searchInput) return;
-    searchInput.addEventListener('input', function() {
-        var query = searchInput.value.toLowerCase();
+    var typeFilter = document.getElementById('rec-type-filter');
+    var tagFilter = document.getElementById('rec-tag-filter');
+    if (!grid) return;
+
+    var activeType = 'all';
+    var activeTag = 'all';
+
+    function applyFilters() {
+        var query = (searchInput ? searchInput.value : '').toLowerCase();
         grid.querySelectorAll('.poster-card').forEach(function(card) {
             var title = (card.getAttribute('data-title') || '').toLowerCase();
             var source = (card.getAttribute('data-source') || '').toLowerCase();
-            card.style.display = (!query || title.indexOf(query) !== -1 || source.indexOf(query) !== -1) ? '' : 'none';
+            var type = card.getAttribute('data-type') || '';
+            var tag = card.getAttribute('data-tag') || 'both';
+            var matchSearch = !query || title.indexOf(query) !== -1 || source.indexOf(query) !== -1;
+            var matchType = activeType === 'all' || type === activeType;
+            var matchTag = activeTag === 'all' || tag === activeTag || tag === 'both';
+            card.style.display = (matchSearch && matchType && matchTag) ? '' : 'none';
         });
-    });
+    }
+
+    if (searchInput) searchInput.addEventListener('input', applyFilters);
+
+    function setupPills(container, callback) {
+        if (!container) return;
+        container.addEventListener('click', function(e) {
+            var btn = e.target.closest('.filter-pill');
+            if (!btn) return;
+            container.querySelectorAll('.filter-pill').forEach(function(b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            callback(btn.getAttribute('data-filter'));
+            applyFilters();
+        });
+    }
+
+    setupPills(typeFilter, function(v) { activeType = v; });
+    setupPills(tagFilter, function(v) { activeTag = v; });
 })();
 </script>
 {% endblock %}

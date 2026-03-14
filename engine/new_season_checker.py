@@ -22,7 +22,7 @@ def check_new_seasons(conn) -> list[dict]:
     """Check all watching series for new seasons. Returns list of alert dicts."""
     cursor = conn.execute(
         "SELECT st.id, st.title_id, st.max_watched_season, st.total_seasons_tmdb, "
-        "       st.last_checked, t.tmdb_id, t.title_en, t.title_he "
+        "       st.last_checked, t.tmdb_id, t.title_en, t.title_he, t.original_language "
         "FROM series_tracking st "
         "JOIN titles t ON st.title_id = t.id "
         "WHERE st.status = 'watching'"
@@ -56,12 +56,17 @@ def check_new_seasons(conn) -> list[dict]:
         stored_total = row["total_seasons_tmdb"] or 0
         user_latest = row["max_watched_season"] or 0
 
+        next_season = user_latest + 1
+        next_air_date = _extract_season_air_date(data, next_season) if next_season <= tmdb_total else None
+        total_episodes = data.get("number_of_episodes")
+
         if tmdb_total > stored_total and tmdb_total > user_latest:
             alerts.append({
                 "title_id": row["title_id"],
                 "tmdb_id": tmdb_id,
                 "title_en": row["title_en"],
                 "title_he": row["title_he"],
+                "original_language": row["original_language"],
                 "new_season": tmdb_total,
                 "air_date": _extract_season_air_date(data, tmdb_total),
             })
@@ -69,9 +74,10 @@ def check_new_seasons(conn) -> list[dict]:
 
         conn.execute(
             "UPDATE series_tracking "
-            "SET total_seasons_tmdb = ?, last_checked = CURRENT_TIMESTAMP "
+            "SET total_seasons_tmdb = ?, next_season_air_date = ?, "
+            "    total_episodes_tmdb = ?, last_checked = CURRENT_TIMESTAMP "
             "WHERE id = ?",
-            (tmdb_total, row["id"])
+            (tmdb_total, next_air_date, total_episodes, row["id"])
         )
         checked += 1
 

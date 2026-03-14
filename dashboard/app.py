@@ -90,7 +90,7 @@ def watch_next():
         tag_sql, tag_params = tag_filter_sql('t')
         recommendations = conn.execute("""
             SELECT r.id, r.recommended_title, r.poster_path, r.recommended_tmdb_id,
-                   r.recommended_type, t.title_he, t.title_en,
+                   r.recommended_type, t.title_he, t.title_en, t.user_tag AS source_tag,
                    CASE WHEN t.original_language = 'he' THEN COALESCE(t.title_he, t.title_en) ELSE COALESCE(t.title_en, t.title_he) END AS source_title
             FROM recommendations r
             JOIN titles t ON r.source_title_id = t.id
@@ -109,8 +109,10 @@ def watch_next():
             recs_with_providers.append({
                 'id': rec['id'],
                 'recommended_title': rec['recommended_title'],
+                'recommended_type': rec['recommended_type'],
                 'poster_path': rec['poster_path'],
                 'source_title': rec['source_title'],
+                'source_tag': rec['source_tag'] or 'both',
                 'providers': providers,
             })
 
@@ -118,7 +120,7 @@ def watch_next():
         # Only show if next season air_date is known AND already released
         continue_rows = conn.execute("""
             SELECT t.id, CASE WHEN t.original_language = 'he' THEN COALESCE(t.title_he, t.title_en) ELSE COALESCE(t.title_en, t.title_he) END AS title,
-                   t.poster_path, t.tmdb_id, t.tmdb_type,
+                   t.poster_path, t.tmdb_id, t.tmdb_type, t.user_tag,
                    st.max_watched_season, st.total_seasons_tmdb
             FROM series_tracking st
             JOIN titles t ON st.title_id = t.id
@@ -141,6 +143,7 @@ def watch_next():
                 'poster_path': row['poster_path'],
                 'next_season': next_season,
                 'total_seasons': row['total_seasons_tmdb'] or 0,
+                'user_tag': row['user_tag'] or 'both',
                 'providers': providers,
             })
 
@@ -159,7 +162,7 @@ def coming_soon():
         tag_sql, tag_params = tag_filter_sql('t')
         alerts_rows = conn.execute("""
             SELECT t.id, CASE WHEN t.original_language = 'he' THEN COALESCE(t.title_he, t.title_en) ELSE COALESCE(t.title_en, t.title_he) END AS title,
-                   t.poster_path, t.tmdb_id, t.tmdb_type,
+                   t.poster_path, t.tmdb_id, t.tmdb_type, t.user_tag,
                    st.max_watched_season, st.total_seasons_tmdb,
                    st.next_season_air_date
             FROM series_tracking st
@@ -195,6 +198,7 @@ def coming_soon():
                 'new_season': new_season,
                 'watched_season': row['max_watched_season'] or 0,
                 'total_seasons': row['total_seasons_tmdb'] or 0,
+                'user_tag': row['user_tag'] or 'both',
                 'providers': providers,
                 'air_date': air_date_display,
                 'days_until': days_until,

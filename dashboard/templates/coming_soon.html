@@ -5,35 +5,100 @@
 
 {% block content %}
 {% if alerts %}
-<p class="section-label" dir="auto">New Seasons</p>
-{% for alert in alerts %}
-<div class="h-card">
-    {% if alert.poster_path %}
-    <img class="h-card-poster" src="https://image.tmdb.org/t/p/w200{{ alert.poster_path }}"
-         alt="{{ alert.title }}" dir="auto">
-    {% endif %}
-    <div class="h-card-body">
-        <h4 dir="auto">{{ alert.title }}</h4>
-        <span class="season-badge" dir="auto">Season {{ alert.new_season }} available</span>
-        <p class="detail" dir="auto">You watched up to Season {{ alert.watched_season }}{% if alert.total_seasons > alert.new_season %} &middot; {{ alert.total_seasons }} seasons total{% endif %}</p>
-        {% if alert.providers %}
-        <div class="card-providers">
-            {% for provider in alert.providers %}
-            {% if provider.provider_logo_path %}
-            <img src="https://image.tmdb.org/t/p/original{{ provider.provider_logo_path }}"
-                 alt="{{ provider.provider_name }}" dir="auto"
-                 title="{{ provider.provider_name }} ({{ provider.monetization_type }})">
-            {% endif %}
-            {% endfor %}
-        </div>
-        {% endif %}
+<h2 class="section-title" dir="auto">Upcoming Seasons</h2>
+<div class="filter-bar" dir="auto">
+    <input type="text" class="filter-search" id="cs-search" placeholder="Search upcoming..." dir="auto">
+    <div class="filter-pills" id="cs-tag-filter">
+        <button class="filter-pill active" data-filter="all">All</button>
+        <button class="filter-pill" data-filter="me">Me</button>
+        <button class="filter-pill" data-filter="wife">Wife</button>
     </div>
 </div>
-{% endfor %}
+<div class="poster-grid" id="cs-grid">
+    {% for alert in alerts %}
+    <div class="poster-card" data-title="{{ alert.title }}" data-tag="{{ alert.user_tag }}">
+        {% if alert.poster_path %}
+        <img class="poster-img" src="https://image.tmdb.org/t/p/w300{{ alert.poster_path }}"
+             alt="{{ alert.title }}" dir="auto">
+        {% else %}
+        <div class="poster-placeholder">&#127916;</div>
+        {% endif %}
+
+        {% if alert.air_date %}
+        {% if alert.days_until is not none and alert.days_until >= 0 %}
+        <span class="air-date-badge" dir="auto">{{ alert.days_until }} days</span>
+        {% else %}
+        <span class="air-date-badge" dir="auto">{{ alert.air_date }}</span>
+        {% endif %}
+        {% else %}
+        <span class="air-date-badge tba" dir="auto">TBA</span>
+        {% endif %}
+
+        <div class="card-info">
+            <p class="card-title" dir="auto">{{ alert.title }}</p>
+            <p class="card-sub" dir="auto">
+                Season {{ alert.new_season }}
+                {% if alert.air_date %} — {{ alert.air_date }}{% endif %}
+            </p>
+            <p class="card-meta" dir="auto">
+                Watched S{{ alert.watched_season }}{% if alert.total_seasons > alert.new_season %} · {{ alert.total_seasons }} seasons total{% endif %}
+            </p>
+            {% if alert.providers %}
+            <div class="provider-row">
+                {% for provider in alert.providers %}
+                {% if provider.provider_logo_path %}
+                <img src="https://image.tmdb.org/t/p/original{{ provider.provider_logo_path }}"
+                     alt="{{ provider.provider_name }}" dir="auto"
+                     title="{{ provider.provider_name }} ({{ provider.monetization_type }})">
+                {% endif %}
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
 {% else %}
 <div class="empty-state">
     <div class="icon">&#9989;</div>
-    <p dir="auto">All caught up! No new seasons detected.</p>
+    <p dir="auto">No upcoming releases tracked yet.</p>
 </div>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    var grid = document.getElementById('cs-grid');
+    var searchInput = document.getElementById('cs-search');
+    var tagFilter = document.getElementById('cs-tag-filter');
+    if (!grid) return;
+
+    var activeTag = 'all';
+
+    function applyFilters() {
+        var query = (searchInput ? searchInput.value : '').toLowerCase();
+        grid.querySelectorAll('.poster-card').forEach(function(card) {
+            var title = (card.getAttribute('data-title') || '').toLowerCase();
+            var tag = card.getAttribute('data-tag') || 'both';
+            var matchSearch = !query || title.indexOf(query) !== -1;
+            var matchTag = activeTag === 'all' || tag === activeTag || tag === 'both';
+            card.style.display = (matchSearch && matchTag) ? '' : 'none';
+        });
+    }
+
+    if (searchInput) searchInput.addEventListener('input', applyFilters);
+
+    if (tagFilter) {
+        tagFilter.addEventListener('click', function(e) {
+            var btn = e.target.closest('.filter-pill');
+            if (!btn) return;
+            tagFilter.querySelectorAll('.filter-pill').forEach(function(b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            activeTag = btn.getAttribute('data-filter');
+            applyFilters();
+        });
+    }
+})();
+</script>
 {% endblock %}

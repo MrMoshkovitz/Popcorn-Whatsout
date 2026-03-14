@@ -48,7 +48,12 @@ def _run_phase_1_new_seasons(consecutive_errors):
                 chat_id = _get_chat_id()
                 if bot and chat_id:
                     for alert in alerts:
-                        title_name = alert.get('title_he') or alert.get('title_en') or 'Unknown'
+                        # Use English title for non-Hebrew content
+                        ol = alert.get('original_language')
+                        if ol == 'he':
+                            title_name = alert.get('title_he') or alert.get('title_en') or 'Unknown'
+                        else:
+                            title_name = alert.get('title_en') or alert.get('title_he') or 'Unknown'
                         try:
                             asyncio.run(send_new_season_alert(
                                 bot, chat_id,
@@ -102,10 +107,33 @@ def _run_phase_3_recommendations(consecutive_errors):
         conn.row_factory = sqlite3.Row
         try:
             stats = generate_all_recommendations(conn)
+            new_recs = stats.get('total_recs', 0)
             logging.info(
                 f"Phase 3 complete: {stats['total_titles']} titles processed, "
-                f"{stats['total_recs']} recommendations generated ({time.time() - phase_start:.1f}s)"
+                f"{new_recs} recommendations generated ({time.time() - phase_start:.1f}s)"
             )
+            # Send Telegram notification about new recommendations
+            if new_recs > 0:
+                from bot.telegram_notifier import send_recommendation, bot
+                chat_id = _get_chat_id()
+                if bot and chat_id:
+                    # Fetch top 5 newest unseen recs to send
+                    recs = conn.execute(
+                        "SELECT r.recommended_title, "
+                        "CASE WHEN t.original_language = 'he' THEN COALESCE(t.title_he, t.title_en) "
+                        "ELSE COALESCE(t.title_en, t.title_he) END AS source_title "
+                        "FROM recommendations r "
+                        "JOIN titles t ON r.source_title_id = t.id "
+                        "WHERE r.status = 'unseen' "
+                        "ORDER BY r.created_at DESC LIMIT 5"
+                    ).fetchall()
+                    if recs:
+                        source = recs[0]['source_title'] or 'your library'
+                        rec_titles = [r['recommended_title'] for r in recs]
+                        try:
+                            asyncio.run(send_recommendation(bot, chat_id, source, rec_titles))
+                        except Exception as e:
+                            logging.error(f"Phase 3: Failed to send rec notification: {e}")
         finally:
             conn.close()
     except Exception as e:
