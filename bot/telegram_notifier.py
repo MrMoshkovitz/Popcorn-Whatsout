@@ -11,6 +11,7 @@ from telegram.ext import Application, CallbackQueryHandler, CommandHandler, Cont
 import telegram.error
 
 from config import TELEGRAM_BOT_TOKEN, TELEGRAM_ADMIN_CHAT_ID, DB_PATH
+from ingestion.tmdb_api import tmdb_get
 
 logger = logging.getLogger(__name__)
 
@@ -117,28 +118,349 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     finally:
         conn.close()
     await update.message.reply_text(
-        "Connected! You'll get notifications for new seasons and recommendations."
+        "\U0001f37f Welcome to Popcorn! You're connected. I'll notify you about new seasons and recommendations."
     )
 
 
 async def recommendations_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle /recommendations — show top unseen recommendations."""
+    """Handle /recommendations — show top unseen recommendations with posters and streaming info."""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     try:
         recs = conn.execute(
-            "SELECT recommended_title FROM recommendations "
-            "WHERE status = 'unseen' ORDER BY created_at DESC LIMIT 5"
+            "SELECT r.recommended_title, r.poster_path, r.recommended_tmdb_id, r.recommended_type, "
+            "GROUP_CONCAT(DISTINCT sa.provider_name) as providers "
+            "FROM recommendations r "
+            "LEFT JOIN streaming_availability sa "
+            "  ON sa.tmdb_id = r.recommended_tmdb_id AND sa.tmdb_type = r.recommended_type "
+            "WHERE r.status = 'unseen' "
+            "GROUP BY r.id "
+            "ORDER BY r.created_at DESC LIMIT 5"
         ).fetchall()
         if recs:
-            text = "Top recommendations:\n" + "\n".join(
-                f"- {r['recommended_title']}" for r in recs
-            )
+            for r in recs:
+                title = r['recommended_title']
+                providers = r['providers']
+                caption = f"\U0001f3ac {title}"
+                if providers:
+                    caption += f"\n\U0001f4fa Available on: {providers}"
+                if r['poster_path']:
+                    try:
+                        await update.message.reply_photo(
+                            photo=f"https://image.tmdb.org/t/p/w200{r['poster_path']}",
+                            caption=caption
+                        )
+                        continue
+                    except telegram.error.TelegramError:
+                        pass
+                await update.message.reply_text(caption)
         else:
-            text = "No recommendations yet. Upload your Netflix history on the dashboard!"
-        await update.message.reply_text(text)
+            await update.message.reply_text(
+                "No recommendations yet. Upload your Netflix history on the dashboard!"
+            )
     finally:
         conn.close()
+
+
+def _get_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def _tmdb_search(query):
+    """Search TMDB for a title, return top result and media_type."""
+    data = tmdb_get('/search/multi', {'query': query, 'language': 'en-US'})
+    if not data:
+        return None, None
+    for r in data.get('results', []):
+        if r.get('media_type') in ('movie', 'tv'):
+            return r, r['media_type']
+    return None, None
+
+
+async def add_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /add <title> — search TMDB and add to library via inline keyboard."""
+    if not context.args:
+        await update.message.reply_text("Usage: /add <title name>")
+        return
+
+    query = ' '.join(context.args)
+    data = tmdb_get('/search/multi', {'query': query, 'language': 'en-US'})
+    if not data or not data.get('results'):
+        await update.message.reply_text(f"No results found for '{query}'.")
+        return
+
+    buttons = []
+    for r in data['results'][:3]:
+        if r.get('media_type') not in ('movie', 'tv'):
+            continue
+        name = r.get('title') or r.get('name', 'Unknown')
+        year = (r.get('release_date') or r.get('first_air_date') or '')[:4]
+        label = f"{name} ({year}) [{r['media_type'].upper()}]" if year else f"{name} [{r['media_type'].upper()}]"
+        buttons.append([InlineKeyboardButton(label, callback_data=f"add_{r['id']}_{r['media_type']}")])
+
+    if not buttons:
+        await update.message.reply_text(f"No movie/TV results for '{query}'.")
+        return
+
+    await update.message.reply_text(
+        f"Results for '<b>{query}</b>' — tap to add:",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(buttons)
+    )
+
+
+async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /search <title> — find recommendations based on a title."""
+    if not context.args:
+        await update.message.reply_text("Usage: /search <title name>")
+        return
+
+    query = ' '.join(context.args)
+    result, media_type = _tmdb_search(query)
+    if not result:
+        await update.message.reply_text(f"No results found for '{query}'.")
+        return
+
+    tmdb_id = result['id']
+    recs_data = tmdb_get(f'/{media_type}/{tmdb_id}/recommendations', {'language': 'en-US'})
+    if not recs_data or not recs_data.get('results'):
+        name = result.get('title') or result.get('name')
+        await update.message.reply_text(f"No recommendations found for '{name}'.")
+        return
+
+    conn = _get_db()
+    try:
+        sent = 0
+        for rec in recs_data['results'][:5]:
+            rec_id = rec['id']
+            rec_type = rec.get('media_type', media_type)
+            # Skip if already in user's library
+            existing = conn.execute(
+                "SELECT 1 FROM titles WHERE tmdb_id = ? AND tmdb_type = ?",
+                (rec_id, rec_type)
+            ).fetchone()
+
+            name = rec.get('original_title') or rec.get('original_name') or rec.get('title') or rec.get('name', '')
+            year = (rec.get('release_date') or rec.get('first_air_date') or '')[:4]
+            watched_tag = " (in library)" if existing else ""
+
+            # Check streaming availability
+            providers = conn.execute(
+                "SELECT GROUP_CONCAT(DISTINCT provider_name) as p FROM streaming_availability WHERE tmdb_id = ? AND tmdb_type = ?",
+                (rec_id, rec_type)
+            ).fetchone()
+            prov_str = providers['p'] if providers and providers['p'] else None
+
+            caption = f"\U0001f3ac {name}"
+            if year:
+                caption += f" ({year})"
+            caption += watched_tag
+            if prov_str:
+                caption += f"\n\U0001f4fa {prov_str}"
+
+            poster = rec.get('poster_path')
+            if poster:
+                try:
+                    await update.message.reply_photo(
+                        photo=f"https://image.tmdb.org/t/p/w200{poster}",
+                        caption=caption
+                    )
+                    sent += 1
+                    continue
+                except telegram.error.TelegramError:
+                    pass
+            await update.message.reply_text(caption)
+            sent += 1
+
+        if sent == 0:
+            await update.message.reply_text("All recommendations are already in your library!")
+    finally:
+        conn.close()
+
+
+async def upcoming_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /upcoming <title> — check next season/sequel info."""
+    if not context.args:
+        await update.message.reply_text("Usage: /upcoming <title name>")
+        return
+
+    query = ' '.join(context.args)
+    result, media_type = _tmdb_search(query)
+    if not result:
+        await update.message.reply_text(f"No results found for '{query}'.")
+        return
+
+    tmdb_id = result['id']
+    name = result.get('title') or result.get('name')
+
+    if media_type == 'tv':
+        detail = tmdb_get(f'/tv/{tmdb_id}', {'language': 'en-US'})
+        if not detail:
+            await update.message.reply_text(f"Couldn't fetch details for '{name}'.")
+            return
+
+        status = detail.get('status', 'Unknown')
+        seasons = detail.get('number_of_seasons', 0)
+        next_ep = detail.get('next_episode_to_air')
+
+        text = f"<b>{name}</b>\nStatus: {status}\nSeasons: {seasons}"
+        if next_ep:
+            air = next_ep.get('air_date', 'TBA')
+            ep_name = next_ep.get('name', '')
+            text += f"\n\nNext episode: S{next_ep.get('season_number', '?')}E{next_ep.get('episode_number', '?')}"
+            if ep_name:
+                text += f" — {ep_name}"
+            text += f"\nAir date: {air}"
+        elif status == 'Returning Series':
+            # Check last season air date
+            last_season = None
+            for s in detail.get('seasons', []):
+                if s.get('season_number', 0) > 0:
+                    last_season = s
+            if last_season and last_season.get('air_date'):
+                text += f"\n\nLast season aired: {last_season['air_date']}"
+            text += "\nNo next episode scheduled yet."
+        else:
+            text += f"\n\nNo upcoming episodes."
+
+        await update.message.reply_text(text, parse_mode="HTML")
+    else:
+        # Movie — check collection for unreleased sequels
+        detail = tmdb_get(f'/movie/{tmdb_id}', {'language': 'en-US'})
+        if not detail:
+            await update.message.reply_text(f"Couldn't fetch details for '{name}'.")
+            return
+
+        collection = detail.get('belongs_to_collection')
+        if not collection:
+            await update.message.reply_text(f"<b>{name}</b>\nNo collection/franchise found.", parse_mode="HTML")
+            return
+
+        coll_data = tmdb_get(f"/collection/{collection['id']}", {'language': 'en-US'})
+        if not coll_data:
+            await update.message.reply_text(f"<b>{name}</b>\nPart of '{collection.get('name')}' but couldn't fetch details.", parse_mode="HTML")
+            return
+
+        text = f"<b>{name}</b>\nCollection: {coll_data.get('name', '')}\n"
+        for part in coll_data.get('parts', []):
+            release = part.get('release_date', '')
+            status_tag = ""
+            if not release:
+                status_tag = " [TBA]"
+            elif release > datetime.now().strftime('%Y-%m-%d'):
+                status_tag = f" [Upcoming: {release}]"
+            text += f"\n- {part.get('title', '?')}{status_tag}"
+
+        await update.message.reply_text(text, parse_mode="HTML")
+
+
+async def similar_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /similar <title> — recommendations + similar, scored by genre overlap."""
+    if not context.args:
+        await update.message.reply_text("Usage: /similar <title name>")
+        return
+
+    query = ' '.join(context.args)
+    result, media_type = _tmdb_search(query)
+    if not result:
+        await update.message.reply_text(f"No results found for '{query}'.")
+        return
+
+    tmdb_id = result['id']
+    name = result.get('title') or result.get('name')
+
+    # Get user's genre profile from library
+    conn = _get_db()
+    try:
+        # Build genre frequency from existing titles (using TMDB genre_ids stored in search results)
+        user_genres = {}
+        titles = conn.execute("SELECT tmdb_id, tmdb_type FROM titles").fetchall()
+    finally:
+        conn.close()
+
+    # Fetch recs + similar
+    recs = tmdb_get(f'/{media_type}/{tmdb_id}/recommendations', {'language': 'en-US'})
+    similar = tmdb_get(f'/{media_type}/{tmdb_id}/similar', {'language': 'en-US'})
+
+    candidates = {}
+    source_genres = set(result.get('genre_ids', []))
+
+    for source_list in [recs, similar]:
+        if not source_list:
+            continue
+        for r in source_list.get('results', []):
+            rid = r['id']
+            if rid == tmdb_id or rid in candidates:
+                continue
+            # Score: genre overlap
+            r_genres = set(r.get('genre_ids', []))
+            overlap = len(source_genres & r_genres)
+            score = overlap * 2 + r.get('vote_average', 0) / 10
+            candidates[rid] = {'result': r, 'score': score}
+
+    if not candidates:
+        await update.message.reply_text(f"No similar titles found for '{name}'.")
+        return
+
+    sorted_recs = sorted(candidates.values(), key=lambda x: x['score'], reverse=True)[:5]
+    for item in sorted_recs:
+        r = item['result']
+        rec_name = r.get('original_title') or r.get('original_name') or r.get('title') or r.get('name', '')
+        year = (r.get('release_date') or r.get('first_air_date') or '')[:4]
+        caption = f"\U0001f3ac {rec_name}"
+        if year:
+            caption += f" ({year})"
+        poster = r.get('poster_path')
+        if poster:
+            try:
+                await update.message.reply_photo(
+                    photo=f"https://image.tmdb.org/t/p/w200{poster}",
+                    caption=caption
+                )
+                continue
+            except telegram.error.TelegramError:
+                pass
+        await update.message.reply_text(caption)
+
+
+async def mystats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /mystats — show library statistics."""
+    conn = _get_db()
+    try:
+        total = conn.execute("SELECT COUNT(*) FROM titles").fetchone()[0]
+        by_type = conn.execute(
+            "SELECT tmdb_type, COUNT(*) as cnt FROM titles GROUP BY tmdb_type"
+        ).fetchall()
+        episodes = conn.execute("SELECT COUNT(*) FROM watch_history").fetchone()[0]
+        recs = conn.execute("SELECT COUNT(*) FROM recommendations WHERE status = 'unseen'").fetchone()[0]
+
+        text = "\U0001f4ca <b>Your Popcorn Stats</b>\n\n"
+        text += f"Total titles: {total}\n"
+        for row in by_type:
+            text += f"  {row['tmdb_type'].upper()}: {row['cnt']}\n"
+        text += f"\nWatch history entries: {episodes}"
+        text += f"\nPending recommendations: {recs}"
+
+        await update.message.reply_text(text, parse_mode="HTML")
+    finally:
+        conn.close()
+
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /help — list available commands."""
+    await update.message.reply_text(
+        "\U0001f37f Popcorn Bot Commands:\n\n"
+        "/start - Connect this chat for notifications\n"
+        "/recommendations - Show top 5 unseen recommendations\n"
+        "/add <title> - Add a title to your library\n"
+        "/search <title> - Get recommendations based on a title\n"
+        "/upcoming <title> - Check next season/sequel info\n"
+        "/similar <title> - Find similar titles with genre matching\n"
+        "/mystats - View your library statistics\n"
+        "/help - Show this help message"
+    )
 
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -148,7 +470,48 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
 
     try:
-        if data.startswith("watched_"):
+        if data.startswith("add_"):
+            parts = data.split("_")
+            tmdb_id = int(parts[1])
+            tmdb_type = parts[2]
+            # Fetch details for both languages
+            details_he = tmdb_get(f'/{tmdb_type}/{tmdb_id}', {'language': 'he-IL'})
+            details_en = tmdb_get(f'/{tmdb_type}/{tmdb_id}', {'language': 'en-US'})
+            title_he = (details_he or {}).get('title') or (details_he or {}).get('name')
+            title_en = (details_en or {}).get('title') or (details_en or {}).get('name')
+            poster = (details_he or details_en or {}).get('poster_path')
+            original_language = (details_en or details_he or {}).get('original_language')
+
+            conn = _get_db()
+            try:
+                conn.execute(
+                    """INSERT OR REPLACE INTO titles
+                       (tmdb_id, tmdb_type, title_he, title_en, poster_path, original_language,
+                        match_status, confidence, source, user_tag)
+                       VALUES (?, ?, ?, ?, ?, ?, 'manual', 1.0, 'manual', 'both')""",
+                    (tmdb_id, tmdb_type, title_he, title_en, poster, original_language)
+                )
+                if tmdb_type == 'tv':
+                    title_id = conn.execute(
+                        "SELECT id FROM titles WHERE tmdb_id = ? AND tmdb_type = ?",
+                        (tmdb_id, tmdb_type)
+                    ).fetchone()['id']
+                    num_seasons = (details_en or details_he or {}).get('number_of_seasons', 1)
+                    total_episodes = (details_en or details_he or {}).get('number_of_episodes')
+                    conn.execute(
+                        """INSERT OR REPLACE INTO series_tracking
+                           (title_id, tmdb_id, max_watched_season, total_seasons_tmdb,
+                            total_episodes_tmdb, status)
+                           VALUES (?, ?, ?, ?, ?, 'watching')""",
+                        (title_id, tmdb_id, num_seasons, num_seasons, total_episodes)
+                    )
+                conn.commit()
+            finally:
+                conn.close()
+            display = title_en if original_language != 'he' else (title_he or title_en)
+            await query.edit_message_text(f"Added '{display}' to your library!")
+
+        elif data.startswith("watched_"):
             tmdb_id = int(data.split("_")[1])
             conn = sqlite3.connect(DB_PATH)
             conn.row_factory = sqlite3.Row
@@ -202,6 +565,7 @@ def run_bot():
     application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("recommendations", recommendations_command))
+    application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CallbackQueryHandler(handle_callback))
     application.add_error_handler(error_handler)
     application.run_polling()
