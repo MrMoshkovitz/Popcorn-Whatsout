@@ -119,6 +119,64 @@ article .grid > div {
     text-align: center;
 }
 
+/* User tag badges */
+.tag-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.7em;
+    font-weight: 600;
+    text-transform: capitalize;
+}
+
+.tag-badge.tag-me {
+    background: #4a90d9;
+    color: #fff;
+}
+
+.tag-badge.tag-wife {
+    background: #d94a8a;
+    color: #fff;
+}
+
+.tag-badge.tag-both {
+    background: #7c5cbf;
+    color: #fff;
+}
+
+/* Tag filter toggle */
+.tag-filter {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.tag-btn {
+    display: inline-block;
+    padding: 4px 14px;
+    border-radius: 16px;
+    font-size: 0.85em;
+    text-decoration: none;
+    border: 1px solid var(--pico-muted-border-color);
+    color: var(--pico-color);
+}
+
+.tag-btn.active {
+    background: var(--pico-primary);
+    color: var(--pico-primary-inverse);
+    border-color: var(--pico-primary);
+}
+
+.tag-btn.tag-me.active {
+    background: #4a90d9;
+    border-color: #4a90d9;
+}
+
+.tag-btn.tag-wife.active {
+    background: #d94a8a;
+    border-color: #d94a8a;
+}
+
 /* Footer TMDB attribution */
 footer small img {
     height: 1em;

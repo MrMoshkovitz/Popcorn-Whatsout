@@ -13,6 +13,7 @@
             <th dir="auto"></th>
             <th dir="auto">Title</th>
             <th dir="auto">Type</th>
+            <th dir="auto">Who</th>
             <th dir="auto">Watched</th>
             <th dir="auto">Last Watched</th>
             <th dir="auto"></th>
@@ -30,6 +31,7 @@
             </td>
             <td dir="auto">{{ title.title_he or title.title_en }}</td>
             <td dir="auto"><small dir="auto">{{ title.tmdb_type }}</small></td>
+            <td dir="auto"><span class="tag-badge tag-{{ title.user_tag or 'both' }}">{{ title.user_tag or 'both' }}</span></td>
             <td dir="auto">{{ title.watch_count }}</td>
             <td dir="auto">{{ title.last_watched }}</td>
             <td>
@@ -53,6 +55,12 @@
 
 <h3 dir="auto">Upload Netflix CSV</h3>
 <form method="post" action="/upload" enctype="multipart/form-data">
+    <label for="upload_user_tag" dir="auto">Whose history?</label>
+    <select name="user_tag" id="upload_user_tag" style="width:auto;display:inline-block;margin-bottom:0.5rem;">
+        <option value="both">Both</option>
+        <option value="me">Me</option>
+        <option value="wife">Wife</option>
+    </select>
     <fieldset role="group">
         <input type="file" name="csv_file" accept=".csv" dir="auto">
         <button type="submit" dir="auto">Upload</button>
@@ -76,6 +84,14 @@
         <label for="watched_seasons" dir="auto">Seasons watched:</label>
         <input type="number" id="watched_seasons" name="watched_seasons"
                min="0" max="99" value="" style="width:120px;">
+    </div>
+    <div style="margin-top:0.5rem;">
+        <label for="add_user_tag" dir="auto">Who watched?</label>
+        <select name="user_tag" id="add_user_tag" style="width:auto;display:inline-block;">
+            <option value="both">Both</option>
+            <option value="me">Me</option>
+            <option value="wife">Wife</option>
+        </select>
     </div>
 </form>
 {% endblock %}

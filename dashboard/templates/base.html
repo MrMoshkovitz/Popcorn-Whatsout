@@ -33,6 +33,12 @@
         {% endif %}
         {% endwith %}
 
+        <div class="tag-filter" dir="auto">
+            <a href="?tag=all" class="tag-btn{% if active_tag == 'all' %} active{% endif %}">All</a>
+            <a href="?tag=me" class="tag-btn tag-me{% if active_tag == 'me' %} active{% endif %}">Me</a>
+            <a href="?tag=wife" class="tag-btn tag-wife{% if active_tag == 'wife' %} active{% endif %}">Wife</a>
+        </div>
+
         {% block content %}{% endblock %}
     </main>
 

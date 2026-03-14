@@ -61,7 +61,7 @@ def _match_single(parsed_name: str, media_type_hint: str) -> dict:
     }
 
 
-def match_entries(entries: list[dict], conn: sqlite3.Connection) -> dict:
+def match_entries(entries: list[dict], conn: sqlite3.Connection, user_tag: str = 'both') -> dict:
     """Match parsed entries to TMDB. Returns stats dict {matched, review, errors}."""
     stats = {"matched": 0, "review": 0, "errors": 0}
 
@@ -106,11 +106,11 @@ def match_entries(entries: list[dict], conn: sqlite3.Connection) -> dict:
 
         cursor.execute(
             """INSERT OR REPLACE INTO titles
-               (tmdb_id, tmdb_type, title_en, title_he, poster_path, confidence, match_status, source)
-               VALUES (?, ?, ?, ?, ?, ?, ?, 'csv')""",
+               (tmdb_id, tmdb_type, title_en, title_he, poster_path, confidence, match_status, source, user_tag)
+               VALUES (?, ?, ?, ?, ?, ?, ?, 'csv', ?)""",
             (match["tmdb_id"], match["tmdb_type"], match["title_en"],
              match["title_he"], match["poster_path"], match["confidence"],
-             match["match_status"]),
+             match["match_status"], user_tag),
         )
 
         # Get the title_id

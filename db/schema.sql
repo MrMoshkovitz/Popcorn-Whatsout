@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS titles (
     confidence REAL DEFAULT 1.0,
     match_status TEXT DEFAULT 'auto' CHECK(match_status IN ('auto', 'review', 'manual')),
     source TEXT DEFAULT 'csv' CHECK(source IN ('csv', 'manual')),
+    user_tag TEXT DEFAULT 'both' CHECK(user_tag IN ('me', 'wife', 'both')),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(tmdb_id, tmdb_type)
 );
@@ -60,6 +61,11 @@ CREATE TABLE IF NOT EXISTS streaming_availability (
 CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT
+);
+
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    filename TEXT PRIMARY KEY,
+    applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_watch_history_title ON watch_history(title_id);

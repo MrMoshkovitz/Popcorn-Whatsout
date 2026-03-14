@@ -39,6 +39,13 @@
            value="{{ title.max_watched_season or 0 }}" style="width:120px;">
     {% endif %}
 
+    <h4 dir="auto">Who Watched</h4>
+    <select name="user_tag" style="width:auto;">
+        <option value="both"{% if title.user_tag == 'both' %} selected{% endif %}>Both</option>
+        <option value="me"{% if title.user_tag == 'me' %} selected{% endif %}>Me</option>
+        <option value="wife"{% if title.user_tag == 'wife' %} selected{% endif %}>Wife</option>
+    </select>
+
     <button type="submit" dir="auto">Save Changes</button>
 </form>
 

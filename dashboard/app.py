@@ -13,11 +13,18 @@ from ingestion.csv_parser import parse_netflix_csv
 from ingestion.tmdb_matcher import match_entries
 from ingestion.tmdb_api import tmdb_get
 from engine.recommendations import generate_recommendations, generate_all_recommendations
+from db.migrate import apply_migrations
 
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.secret_key = _os.urandom(24)
+
+# Apply pending database migrations on startup
+try:
+    apply_migrations(DB_PATH)
+except Exception as e:
+    logger.error(f"Migration failed on startup: {e}")
 
 
 def get_db():
@@ -37,6 +44,28 @@ def get_review_count():
         conn.close()
 
 
+def get_active_tag():
+    """Get active user tag filter from query string."""
+    tag = request.args.get('tag', 'all')
+    if tag not in ('me', 'wife', 'all'):
+        tag = 'all'
+    return tag
+
+
+def tag_filter_sql(table_alias='t'):
+    """Return SQL WHERE clause and params for user_tag filtering."""
+    tag = get_active_tag()
+    if tag == 'all':
+        return '', ()
+    return f" AND {table_alias}.user_tag IN (?, 'both')", (tag,)
+
+
+@app.context_processor
+def inject_tag():
+    """Make active_tag available in all templates."""
+    return {'active_tag': get_active_tag()}
+
+
 @app.route('/')
 def index():
     return redirect(url_for('watch_next'))
@@ -46,15 +75,16 @@ def index():
 def watch_next():
     conn = get_db()
     try:
+        tag_sql, tag_params = tag_filter_sql('t')
         recommendations = conn.execute("""
             SELECT r.id, r.recommended_title, r.poster_path, r.recommended_tmdb_id,
                    r.recommended_type, t.title_he, t.title_en,
                    COALESCE(t.title_he, t.title_en) AS source_title
             FROM recommendations r
             JOIN titles t ON r.source_title_id = t.id
-            WHERE r.status = ?
+            WHERE r.status = ?""" + tag_sql + """
             ORDER BY r.created_at DESC
-        """, ('unseen',)).fetchall()
+        """, ('unseen',) + tag_params).fetchall()
 
         # Attach streaming providers to each recommendation
         recs_with_providers = []
@@ -79,9 +109,9 @@ def watch_next():
                    st.max_watched_season, st.total_seasons_tmdb
             FROM series_tracking st
             JOIN titles t ON st.title_id = t.id
-            WHERE st.status = ? AND st.total_seasons_tmdb > st.max_watched_season
+            WHERE st.status = ? AND st.total_seasons_tmdb > st.max_watched_season""" + tag_sql + """
             ORDER BY t.title_en
-        """, ('watching',)).fetchall()
+        """, ('watching',) + tag_params).fetchall()
 
         continue_watching = []
         for row in continue_rows:
@@ -111,15 +141,16 @@ def watch_next():
 def coming_soon():
     conn = get_db()
     try:
+        tag_sql, tag_params = tag_filter_sql('t')
         alerts_rows = conn.execute("""
             SELECT t.id, COALESCE(t.title_he, t.title_en) AS title,
                    t.poster_path, t.tmdb_id, t.tmdb_type,
                    st.max_watched_season, st.total_seasons_tmdb
             FROM series_tracking st
             JOIN titles t ON st.title_id = t.id
-            WHERE st.status = ? AND st.total_seasons_tmdb > st.max_watched_season
+            WHERE st.status = ? AND st.total_seasons_tmdb > st.max_watched_season""" + tag_sql + """
             ORDER BY t.title_en
-        """, ('watching',)).fetchall()
+        """, ('watching',) + tag_params).fetchall()
 
         alerts = []
         for row in alerts_rows:
@@ -149,15 +180,17 @@ def coming_soon():
 def library():
     conn = get_db()
     try:
+        tag_sql, tag_params = tag_filter_sql('t')
         titles = conn.execute("""
             SELECT t.id, t.title_he, t.title_en, t.tmdb_type, t.poster_path,
-                   COUNT(wh.id) AS watch_count,
+                   t.user_tag, COUNT(wh.id) AS watch_count,
                    MAX(wh.watch_date) AS last_watched
             FROM titles t
             LEFT JOIN watch_history wh ON t.id = wh.title_id
+            WHERE 1=1""" + tag_sql + """
             GROUP BY t.id
             ORDER BY last_watched DESC
-        """).fetchall()
+        """, tag_params).fetchall()
 
         return render_template('library.html',
                                titles=titles,
@@ -225,7 +258,11 @@ def upload():
             flash('No valid entries found in CSV.')
             return redirect(url_for('library'))
 
-        stats = match_entries(entries, conn)
+        user_tag = request.form.get('user_tag', 'both')
+        if user_tag not in ('me', 'wife', 'both'):
+            user_tag = 'both'
+
+        stats = match_entries(entries, conn, user_tag=user_tag)
 
         # Generate recommendations for all matched titles
         try:
@@ -290,6 +327,10 @@ def add():
         flash('Invalid title selection.')
         return redirect(url_for('library'))
 
+    user_tag = request.form.get('user_tag', 'both')
+    if user_tag not in ('me', 'wife', 'both'):
+        user_tag = 'both'
+
     details_he = tmdb_get(f'/{tmdb_type}/{tmdb_id}', {'language': 'he-IL'})
     details_en = tmdb_get(f'/{tmdb_type}/{tmdb_id}', {'language': 'en-US'})
 
@@ -297,13 +338,14 @@ def add():
     try:
         conn.execute("""
             INSERT OR REPLACE INTO titles
-            (tmdb_id, tmdb_type, title_he, title_en, poster_path, match_status, confidence, source)
-            VALUES (?, ?, ?, ?, ?, 'manual', 1.0, 'manual')
+            (tmdb_id, tmdb_type, title_he, title_en, poster_path, match_status, confidence, source, user_tag)
+            VALUES (?, ?, ?, ?, ?, 'manual', 1.0, 'manual', ?)
         """, (
             tmdb_id, tmdb_type,
             (details_he or {}).get('title') or (details_he or {}).get('name'),
             (details_en or {}).get('title') or (details_en or {}).get('name'),
             (details_he or details_en or {}).get('poster_path'),
+            user_tag,
         ))
 
         # Get the title_id for recommendation generation
@@ -411,7 +453,7 @@ def edit_title(title_id):
     try:
         title = conn.execute("""
             SELECT t.id, t.tmdb_id, t.tmdb_type, t.title_he, t.title_en, t.poster_path,
-                   st.max_watched_season, st.total_seasons_tmdb
+                   t.user_tag, st.max_watched_season, st.total_seasons_tmdb
             FROM titles t
             LEFT JOIN series_tracking st ON t.id = st.title_id
             WHERE t.id = ?
@@ -445,6 +487,14 @@ def edit_title_post(title_id):
                 (details_he or details_en or {}).get('poster_path'),
                 title_id,
             ))
+
+        # Handle user tag update
+        new_tag = request.form.get('user_tag', '')
+        if new_tag in ('me', 'wife', 'both'):
+            conn.execute(
+                "UPDATE titles SET user_tag = ? WHERE id = ?",
+                (new_tag, title_id)
+            )
 
         # Handle watched seasons update for TV
         watched_seasons = request.form.get('watched_seasons', type=int)

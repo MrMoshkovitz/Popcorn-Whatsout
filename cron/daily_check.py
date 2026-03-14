@@ -19,6 +19,7 @@ import sqlite3
 from datetime import datetime, timedelta
 
 from config import DB_PATH, TELEGRAM_ADMIN_CHAT_ID, DISAMBIGUATION_TIMEOUT_HOURS
+from db.migrate import apply_migrations
 
 # Set up dual logging: stdout + file
 log_file = os.path.join(os.path.dirname(__file__), '..', 'logs', 'cron.log')
@@ -165,6 +166,12 @@ def daily_check():
     logging.info("=" * 50)
     logging.info("Daily check started")
     logging.info("=" * 50)
+
+    # Apply pending migrations before running phases
+    try:
+        apply_migrations(DB_PATH)
+    except Exception as e:
+        logging.error(f"Migration failed: {e}")
 
     consecutive_errors = 0
     consecutive_errors = _run_phase_1_new_seasons(consecutive_errors)
