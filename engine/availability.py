@@ -1,12 +1,13 @@
 import logging
 from ingestion.tmdb_api import tmdb_get
+from config import WATCH_REGION
 
 logger = logging.getLogger(__name__)
 
 
 def update_availability(conn, tmdb_id: int, tmdb_type: str) -> int:
     """Update streaming availability for one title. Returns provider count."""
-    data = tmdb_get(f"/{tmdb_type}/{tmdb_id}/watch/providers")
+    data = tmdb_get(f"/{tmdb_type}/{tmdb_id}/watch/providers", {"watch_region": WATCH_REGION})
     if data is None:
         return 0
 

@@ -1,6 +1,8 @@
 import time
 import logging
 import requests
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 from config import TMDB_API_KEY, TMDB_BASE_URL, TMDB_LANGUAGE_PRIMARY, TMDB_LANGUAGE_FALLBACK, API_DELAY_SECONDS
 
 logger = logging.getLogger(__name__)
@@ -12,7 +14,7 @@ def tmdb_get(endpoint: str, params: dict = None) -> dict | None:
     params = params or {}
     params["api_key"] = TMDB_API_KEY
     try:
-        response = requests.get(url, params=params, timeout=10)
+        response = requests.get(url, params=params, timeout=10, verify=False)
         response.raise_for_status()
         return response.json()
     except requests.RequestException as e:

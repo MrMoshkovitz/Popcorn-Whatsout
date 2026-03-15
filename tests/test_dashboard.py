@@ -286,5 +286,114 @@ class TestDashboard(unittest.TestCase):
         self.assertIn('lib-search', html)
 
 
+    def test_coming_soon_shows_returning_series(self):
+        """Returning series (caught up, show still producing) should appear in coming soon."""
+        conn = self.get_db()
+        conn.execute("""
+            INSERT INTO titles (tmdb_id, tmdb_type, title_en, match_status, confidence)
+            VALUES (?, ?, ?, ?, ?)
+        """, (7777, 'tv', 'Returning Show', 'auto', 0.9))
+        title_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        conn.execute("""
+            INSERT INTO series_tracking
+            (title_id, tmdb_id, total_seasons_tmdb, max_watched_season, status, returning_series)
+            VALUES (?, ?, ?, ?, 'watching', 1)
+        """, (title_id, 7777, 3, 3))  # caught up at season 3, show is returning
+        conn.commit()
+        conn.close()
+
+        response = self.client.get('/coming-soon')
+        self.assertEqual(response.status_code, 200)
+        html = response.data.decode('utf-8')
+        self.assertIn('Returning Show', html)
+        self.assertIn('Returning', html)
+
+    def test_coming_soon_franchise_alerts(self):
+        """Franchise tracking entries should appear in coming soon."""
+        conn = self.get_db()
+        conn.execute("""
+            INSERT INTO franchise_tracking
+            (collection_id, collection_name, total_parts, watched_parts,
+             next_unreleased_tmdb_id, next_unreleased_title, next_unreleased_poster,
+             next_release_date, source_title_ids)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (263, 'The Dark Knight Collection', 3, 2, 49026,
+              'The Dark Knight Rises', '/dkr.jpg', '2099-01-01', '1,2'))
+        conn.commit()
+        conn.close()
+
+        response = self.client.get('/coming-soon')
+        self.assertEqual(response.status_code, 200)
+        html = response.data.decode('utf-8')
+        self.assertIn('The Dark Knight Rises', html)
+        self.assertIn('The Dark Knight Collection', html)
+
+    def test_watch_next_genre_grouping(self):
+        """Recommendations with genres should be grouped by genre on watch next."""
+        conn = self.get_db()
+        conn.execute("""
+            INSERT INTO titles (tmdb_id, tmdb_type, title_en, match_status, confidence)
+            VALUES (?, ?, ?, ?, ?)
+        """, (155, 'movie', 'The Dark Knight', 'auto', 0.9))
+        title_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+
+        conn.execute("""
+            INSERT INTO recommendations
+            (source_title_id, recommended_tmdb_id, recommended_type,
+             recommended_title, poster_path, genres, status)
+            VALUES (?, ?, 'movie', ?, '/poster.jpg', ?, 'unseen')
+        """, (title_id, 272, 'Batman Begins', '["Action","Adventure"]'))
+        conn.commit()
+        conn.close()
+
+        response = self.client.get('/watch-next')
+        self.assertEqual(response.status_code, 200)
+        html = response.data.decode('utf-8')
+        self.assertIn('Batman Begins', html)
+        self.assertIn('Action Movies For You', html)
+
+    def test_watch_next_franchise_catchup(self):
+        """Collection recommendations should appear in franchise catch-up."""
+        conn = self.get_db()
+        conn.execute("""
+            INSERT INTO titles (tmdb_id, tmdb_type, title_en, match_status, confidence)
+            VALUES (?, ?, ?, ?, ?)
+        """, (155, 'movie', 'The Dark Knight', 'auto', 0.9))
+        title_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+
+        conn.execute("""
+            INSERT INTO recommendations
+            (source_title_id, recommended_tmdb_id, recommended_type,
+             recommended_title, poster_path, collection_name, genres, status)
+            VALUES (?, ?, 'movie', ?, '/poster.jpg', ?, '["Action"]', 'unseen')
+        """, (title_id, 49026, 'The Dark Knight Rises', 'The Dark Knight Collection'))
+        conn.commit()
+        conn.close()
+
+        response = self.client.get('/watch-next')
+        self.assertEqual(response.status_code, 200)
+        html = response.data.decode('utf-8')
+        self.assertIn('The Dark Knight Collection', html)
+        self.assertIn('The Dark Knight Rises', html)
+
+    def test_delete_all_clears_franchise_tracking(self):
+        """delete-all should also clear franchise_tracking table."""
+        conn = self.get_db()
+        conn.execute("""
+            INSERT INTO franchise_tracking
+            (collection_id, collection_name, total_parts, source_title_ids)
+            VALUES (?, ?, ?, ?)
+        """, (263, 'Test Collection', 3, '1'))
+        conn.commit()
+        conn.close()
+
+        self.client.post('/delete-all')
+
+        conn = self.get_db()
+        count = conn.execute("SELECT COUNT(*) FROM franchise_tracking").fetchone()[0]
+        self.assertEqual(count, 0)
+        conn.close()
+
+
 if __name__ == '__main__':
     unittest.main()

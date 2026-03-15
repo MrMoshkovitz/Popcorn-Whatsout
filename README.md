@@ -36,12 +36,27 @@ Personal movie & TV tracker: Netflix CSV import, TMDB matching, recommendations,
    ```bash
    python dashboard/app.py
    ```
-   Open http://localhost:8080 in your browser.
+   Open http://localhost:5000 in your browser.
+
+## Running the Telegram Bot
+
+The bot runs as a separate process from the dashboard:
+
+```bash
+# Terminal 1 — Dashboard
+python dashboard/app.py
+
+# Terminal 2 — Telegram Bot
+python bot/run_bot.py
+```
+
+Bot commands: `/start`, `/recommendations`, `/help`
 
 ## Key Commands
 
 ```bash
 python dashboard/app.py          # Run the dashboard
+python bot/run_bot.py            # Run the Telegram bot
 pytest tests/                    # Run tests
 python cron/daily_check.py       # Run daily cron manually
 sqlite3 popcorn.db < db/schema.sql  # Initialize database

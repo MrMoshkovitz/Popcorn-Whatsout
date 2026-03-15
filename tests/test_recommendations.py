@@ -1,5 +1,6 @@
-"""Tests for recommendation engine — 6 test cases with mocked TMDB API."""
+"""Tests for recommendation engine — 8 test cases with mocked TMDB API."""
 
+import json
 from unittest.mock import patch
 
 
@@ -22,7 +23,7 @@ def _seed_watch_history(conn, title_id, watch_date="2023-01-15"):
     conn.commit()
 
 
-def _make_rec_result(title, tmdb_id, vote_average=7.5, media_type="movie"):
+def _make_rec_result(title, tmdb_id, vote_average=7.5, media_type="movie", genre_ids=None):
     return {
         "id": tmdb_id,
         "title": title,
@@ -30,6 +31,7 @@ def _make_rec_result(title, tmdb_id, vote_average=7.5, media_type="movie"):
         "media_type": media_type,
         "poster_path": "/poster.jpg",
         "vote_average": vote_average,
+        "genre_ids": genre_ids or [],
     }
 
 
@@ -186,3 +188,65 @@ class TestDismissedNotRegenerated:
         rec_ids = [r["recommended_tmdb_id"] for r in cursor.fetchall()]
         assert 272 in rec_ids
         assert 49026 not in rec_ids
+
+
+class TestGenresStoredOnRecommendations:
+    @patch("engine.recommendations.get_genre_names")
+    @patch("engine.recommendations.tmdb_get")
+    def test_genres_stored(self, mock_tmdb, mock_genres, db_conn):
+        """Recommendations should store genres from TMDB genre_ids."""
+        source_id = _seed_title(db_conn, 155, "movie", "The Dark Knight")
+        mock_genres.return_value = ["Action", "Adventure"]
+        mock_tmdb.return_value = {
+            "results": [_make_rec_result("Batman Begins", 272, genre_ids=[28, 12])]
+        }
+
+        from engine.recommendations import generate_recommendations
+        generate_recommendations(db_conn, 155, "movie", source_id)
+
+        row = db_conn.execute(
+            "SELECT genres FROM recommendations WHERE recommended_tmdb_id = ?",
+            (272,),
+        ).fetchone()
+        assert row is not None
+        genres = json.loads(row["genres"])
+        assert "Action" in genres
+        assert "Adventure" in genres
+
+
+class TestCollectionNameStoredOnRecommendations:
+    @patch("engine.recommendations.get_genre_names")
+    @patch("engine.recommendations.tmdb_get")
+    def test_collection_name_stored(self, mock_tmdb, mock_genres, db_conn):
+        """Collection recs should store collection_name."""
+        source_id = _seed_title(db_conn, 155, "movie", "The Dark Knight")
+        mock_genres.return_value = ["Action"]
+
+        def side_effect(endpoint, params=None):
+            if "/recommendations" in endpoint:
+                return {"results": []}
+            if endpoint == "/movie/155":
+                return {"belongs_to_collection": {"id": 263, "name": "The Dark Knight Collection"}}
+            if endpoint == "/collection/263":
+                return {
+                    "name": "The Dark Knight Collection",
+                    "parts": [
+                        {"id": 272, "title": "Batman Begins", "poster_path": "/bb.jpg",
+                         "vote_average": 7.7, "genre_ids": [28]},
+                        {"id": 155, "title": "The Dark Knight", "poster_path": "/dk.jpg",
+                         "vote_average": 9.0, "genre_ids": [28]},
+                    ],
+                }
+            return None
+
+        mock_tmdb.side_effect = side_effect
+
+        from engine.recommendations import generate_recommendations
+        generate_recommendations(db_conn, 155, "movie", source_id)
+
+        row = db_conn.execute(
+            "SELECT collection_name FROM recommendations WHERE recommended_tmdb_id = ?",
+            (272,),
+        ).fetchone()
+        assert row is not None
+        assert row["collection_name"] == "The Dark Knight Collection"

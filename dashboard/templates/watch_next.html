@@ -162,6 +162,7 @@
              data-tmdb-id="{{ rec.recommended_tmdb_id }}" data-tmdb-type="{{ rec.recommended_type }}"
              data-overview="{{ rec.overview }}" data-backdrop-path="{{ rec.backdrop_path }}"
              data-vote-average="{{ rec.vote_average }}" data-release-year="{{ rec.release_year }}"
+             data-score="{{ rec.match_score or 0 }}"
              data-stagger="{{ loop.index0 * 50 }}"
              onclick="Popcorn.openModal('{{ rec.recommended_type }}', {{ rec.recommended_tmdb_id }}, {title:'{{ rec.recommended_title|e }}',poster_path:'{{ rec.poster_path }}',backdrop_path:'{{ rec.backdrop_path }}',overview:this.getAttribute('data-overview'),vote_average:{{ rec.vote_average or 0 }},release_year:'{{ rec.release_year }}'})">
             {% if rec.poster_path %}
@@ -170,8 +171,12 @@
             {% else %}
             <div class="poster-placeholder">&#127916;</div>
             {% endif %}
-            {% if rec.vote_average %}
-            <span class="card-rating">{{ "%.1f"|format(rec.vote_average) }}</span>
+            {% if rec.match_score >= 70 %}
+            <span class="card-rating match-badge match-high">{{ rec.match_score }}%</span>
+            {% elif rec.match_score >= 40 %}
+            <span class="card-rating match-badge match-mid">{{ rec.match_score }}%</span>
+            {% elif rec.match_score > 0 %}
+            <span class="card-rating match-badge match-low">{{ rec.match_score }}%</span>
             {% endif %}
             <span class="poster-badge badge-{{ rec.recommended_type }}">{{ rec.recommended_type }}</span>
             {% if rec.providers %}
@@ -222,6 +227,7 @@
              data-tmdb-id="{{ rec.recommended_tmdb_id }}" data-tmdb-type="movie"
              data-overview="{{ rec.overview }}" data-backdrop-path="{{ rec.backdrop_path }}"
              data-vote-average="{{ rec.vote_average }}" data-release-year="{{ rec.release_year }}"
+             data-score="{{ rec.match_score or 0 }}"
              data-stagger="{{ loop.index0 * 50 }}"
              onclick="Popcorn.openModal('movie', {{ rec.recommended_tmdb_id }}, {title:'{{ rec.recommended_title|e }}',poster_path:'{{ rec.poster_path }}',backdrop_path:'{{ rec.backdrop_path }}',overview:this.getAttribute('data-overview'),vote_average:{{ rec.vote_average or 0 }},release_year:'{{ rec.release_year }}'})">
             {% if rec.poster_path %}
@@ -230,8 +236,12 @@
             {% else %}
             <div class="poster-placeholder">&#127916;</div>
             {% endif %}
-            {% if rec.vote_average %}
-            <span class="card-rating">{{ "%.1f"|format(rec.vote_average) }}</span>
+            {% if rec.match_score >= 70 %}
+            <span class="card-rating match-badge match-high">{{ rec.match_score }}%</span>
+            {% elif rec.match_score >= 40 %}
+            <span class="card-rating match-badge match-mid">{{ rec.match_score }}%</span>
+            {% elif rec.match_score > 0 %}
+            <span class="card-rating match-badge match-low">{{ rec.match_score }}%</span>
             {% endif %}
             <span class="poster-badge badge-movie">movie</span>
             {% if rec.providers %}
@@ -284,6 +294,7 @@
              data-tmdb-id="{{ rec.recommended_tmdb_id }}" data-tmdb-type="tv"
              data-overview="{{ rec.overview }}" data-backdrop-path="{{ rec.backdrop_path }}"
              data-vote-average="{{ rec.vote_average }}" data-release-year="{{ rec.release_year }}"
+             data-score="{{ rec.match_score or 0 }}"
              data-stagger="{{ loop.index0 * 50 }}"
              onclick="Popcorn.openModal('tv', {{ rec.recommended_tmdb_id }}, {title:'{{ rec.recommended_title|e }}',poster_path:'{{ rec.poster_path }}',backdrop_path:'{{ rec.backdrop_path }}',overview:this.getAttribute('data-overview'),vote_average:{{ rec.vote_average or 0 }},release_year:'{{ rec.release_year }}'})">
             {% if rec.poster_path %}
@@ -292,8 +303,12 @@
             {% else %}
             <div class="poster-placeholder">&#127916;</div>
             {% endif %}
-            {% if rec.vote_average %}
-            <span class="card-rating">{{ "%.1f"|format(rec.vote_average) }}</span>
+            {% if rec.match_score >= 70 %}
+            <span class="card-rating match-badge match-high">{{ rec.match_score }}%</span>
+            {% elif rec.match_score >= 40 %}
+            <span class="card-rating match-badge match-mid">{{ rec.match_score }}%</span>
+            {% elif rec.match_score > 0 %}
+            <span class="card-rating match-badge match-low">{{ rec.match_score }}%</span>
             {% endif %}
             <span class="poster-badge badge-tv">tv</span>
             {% if rec.providers %}

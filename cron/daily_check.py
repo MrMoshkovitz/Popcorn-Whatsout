@@ -126,15 +126,18 @@ def _run_phase_3_recommendations(consecutive_errors):
     logging.info("Phase 3: Generating recommendations...")
     phase_start = time.time()
     try:
-        from engine.recommendations import generate_all_recommendations
+        from engine.recommendations import generate_all_recommendations, purge_library_recommendations
+        from engine.taste_scorer import score_all_recommendations
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row
         try:
             stats = generate_all_recommendations(conn)
             new_recs = stats.get('total_recs', 0)
+            score_all_recommendations(conn)
+            purged = purge_library_recommendations(conn)
             logging.info(
                 f"Phase 3 complete: {stats['total_titles']} titles processed, "
-                f"{new_recs} recommendations generated ({time.time() - phase_start:.1f}s)"
+                f"{new_recs} recommendations generated, {purged} purged ({time.time() - phase_start:.1f}s)"
             )
             # Send Telegram notification about new recommendations
             if new_recs > 0:
@@ -149,7 +152,7 @@ def _run_phase_3_recommendations(consecutive_errors):
                         "FROM recommendations r "
                         "JOIN titles t ON r.source_title_id = t.id "
                         "WHERE r.status = 'unseen' "
-                        "ORDER BY r.created_at DESC LIMIT 5"
+                        "ORDER BY r.match_score DESC LIMIT 5"
                     ).fetchall()
                     if recs:
                         source = recs[0]['source_title'] or 'your library'

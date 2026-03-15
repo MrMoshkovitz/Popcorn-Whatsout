@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS recommendations (
     overview TEXT,
     backdrop_path TEXT,
     release_year TEXT,
+    match_score REAL DEFAULT 0,
     status TEXT DEFAULT 'unseen' CHECK(status IN ('unseen', 'dismissed', 'watched')),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(source_title_id, recommended_tmdb_id)

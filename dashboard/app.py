@@ -14,7 +14,8 @@ from config import DB_PATH
 from ingestion.csv_parser import parse_netflix_csv
 from ingestion.tmdb_matcher import match_entries
 from ingestion.tmdb_api import tmdb_get
-from engine.recommendations import generate_recommendations, generate_all_recommendations
+from engine.recommendations import generate_recommendations, generate_all_recommendations, purge_library_recommendations
+from engine.taste_scorer import score_all_recommendations
 from db.migrate import apply_migrations
 
 logger = logging.getLogger(__name__)
@@ -142,12 +143,13 @@ def watch_next():
                    r.recommended_type, r.collection_name, r.genres,
                    r.overview AS rec_overview, r.backdrop_path AS rec_backdrop,
                    r.release_year AS rec_year, r.tmdb_recommendation_score AS vote_avg,
+                   r.match_score,
                    t.user_tag AS source_tag,
                    CASE WHEN t.original_language = 'he' THEN COALESCE(t.title_he, t.title_en) ELSE COALESCE(t.title_en, t.title_he) END AS source_title
             FROM recommendations r
             JOIN titles t ON r.source_title_id = t.id
             WHERE r.status = ?""" + tag_sql + """
-            ORDER BY r.tmdb_recommendation_score DESC
+            ORDER BY r.match_score DESC, r.tmdb_recommendation_score DESC
         """, ('unseen',) + tag_params).fetchall()
 
         # Attach providers and parse genres
@@ -194,6 +196,7 @@ def watch_next():
                 'backdrop_path': rec['rec_backdrop'] or '',
                 'release_year': rec['rec_year'] or '',
                 'vote_average': rec['vote_avg'] or 0,
+                'match_score': rec['match_score'] or 0,
             }
 
             if rec['collection_name']:
@@ -435,6 +438,27 @@ def review():
         conn.close()
 
 
+@app.route('/bulk-accept', methods=['POST'])
+def bulk_accept():
+    threshold = request.form.get('threshold', type=int)
+    if threshold is None or threshold < 0 or threshold > 100:
+        threshold = 45
+    threshold_decimal = threshold / 100.0
+    conn = get_db()
+    try:
+        cursor = conn.execute(
+            "UPDATE titles SET match_status = 'auto' "
+            "WHERE match_status = 'review' AND confidence >= ?",
+            (threshold_decimal,)
+        )
+        conn.commit()
+        count = cursor.rowcount
+        flash(f'Accepted {count} titles with confidence >= {threshold}%.')
+    finally:
+        conn.close()
+    return redirect(url_for('review'))
+
+
 @app.route('/upload', methods=['POST'])
 def upload():
     conn = get_db()
@@ -482,6 +506,7 @@ def upload():
         try:
             rec_stats = generate_all_recommendations(conn)
             rec_count = rec_stats.get('total_recs', 0)
+            purge_library_recommendations(conn)
         except Exception as e:
             logger.warning(f"Recommendation generation failed: {e}")
             rec_count = 0
@@ -619,6 +644,8 @@ def add():
         # Generate recommendations for this title
         try:
             generate_recommendations(conn, tmdb_id, tmdb_type, title_id)
+            purge_library_recommendations(conn)
+            score_all_recommendations(conn)
         except Exception as e:
             logger.warning(f"Recommendation generation failed for added title: {e}")
 

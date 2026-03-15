@@ -72,12 +72,19 @@ def check_new_seasons(conn) -> list[dict]:
             })
             logger.info(f"New season detected: {row['title_en']} — season {tmdb_total}")
 
+        # Flag returning series: user caught up but show is still producing
+        tmdb_status = data.get("status")  # "Returning Series", "Ended", "Canceled", "In Production"
+        if tmdb_status in ("Returning Series", "In Production") and user_latest >= tmdb_total:
+            returning = 1
+        else:
+            returning = 0
+
         conn.execute(
             "UPDATE series_tracking "
             "SET total_seasons_tmdb = ?, next_season_air_date = ?, "
-            "    total_episodes_tmdb = ?, last_checked = CURRENT_TIMESTAMP "
+            "    total_episodes_tmdb = ?, returning_series = ?, last_checked = CURRENT_TIMESTAMP "
             "WHERE id = ?",
-            (tmdb_total, next_air_date, total_episodes, row["id"])
+            (tmdb_total, next_air_date, total_episodes, returning, row["id"])
         )
         checked += 1
 

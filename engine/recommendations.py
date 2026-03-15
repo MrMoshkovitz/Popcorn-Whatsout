@@ -12,11 +12,22 @@ REC_CAP_TV = 3
 
 def _is_already_watched(conn, tmdb_id: int, tmdb_type: str) -> bool:
     cursor = conn.execute(
-        "SELECT 1 FROM titles t JOIN watch_history wh ON t.id = wh.title_id "
-        "WHERE t.tmdb_id = ? AND t.tmdb_type = ?",
+        "SELECT 1 FROM titles WHERE tmdb_id = ? AND tmdb_type = ?",
         (tmdb_id, tmdb_type)
     )
     return cursor.fetchone() is not None
+
+
+def purge_library_recommendations(conn) -> int:
+    """Delete unseen recommendations for titles already in user's library."""
+    cursor = conn.execute(
+        "DELETE FROM recommendations WHERE recommended_tmdb_id IN "
+        "(SELECT tmdb_id FROM titles) AND status = 'unseen'"
+    )
+    conn.commit()
+    purged = cursor.rowcount
+    logger.info(f"Purged {purged} recommendations for titles already in library")
+    return purged
 
 
 def _is_dismissed(conn, source_title_id: int, recommended_tmdb_id: int) -> bool:
@@ -151,6 +162,13 @@ def generate_all_recommendations(conn) -> dict:
         except Exception as e:
             logger.error(f"Error generating recs for title_id={title['id']}: {e}")
             stats["errors"] += 1
+
+    # Score all recommendations after generation
+    try:
+        from engine.taste_scorer import score_all_recommendations
+        score_all_recommendations(conn)
+    except Exception as e:
+        logger.error(f"Scoring failed: {e}")
 
     logger.info(f"Recommendation generation complete: {stats}")
     return stats
