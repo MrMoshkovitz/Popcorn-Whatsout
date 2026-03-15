@@ -1,9 +1,11 @@
+import json
 import logging
 import sqlite3
 from difflib import SequenceMatcher
 
 from config import MATCH_CONFIDENCE_THRESHOLD, DB_PATH
 from ingestion.tmdb_api import two_pass_search_with_type_fallback, tmdb_get
+from engine.genre_map import get_genre_names
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +33,12 @@ def _build_matched_title(parsed_name: str, result: dict, media_type: str) -> dic
 
     title_en = result.get("original_title") or result.get("original_name")
 
+    genre_ids = result.get("genre_ids", [])
+    genre_names = get_genre_names(genre_ids, media_type)
+
+    release_date = result.get("release_date") or result.get("first_air_date") or ""
+    release_year = release_date[:4] if release_date else None
+
     return {
         "parsed_name": parsed_name,
         "tmdb_id": result.get("id"),
@@ -41,6 +49,11 @@ def _build_matched_title(parsed_name: str, result: dict, media_type: str) -> dic
         "confidence": confidence,
         "match_status": match_status,
         "poster_path": result.get("poster_path"),
+        "genres": json.dumps(genre_names) if genre_names else None,
+        "overview": result.get("overview"),
+        "backdrop_path": result.get("backdrop_path"),
+        "vote_average": result.get("vote_average"),
+        "release_year": release_year,
     }
 
 
@@ -61,6 +74,11 @@ def _match_single(parsed_name: str, media_type_hint: str) -> dict:
         "confidence": 0.0,
         "match_status": "review",
         "poster_path": None,
+        "genres": None,
+        "overview": None,
+        "backdrop_path": None,
+        "vote_average": None,
+        "release_year": None,
     }
 
 
@@ -96,6 +114,11 @@ def match_entries(entries: list[dict], conn: sqlite3.Connection, user_tag: str =
                 "confidence": 0.0,
                 "match_status": "review",
                 "poster_path": None,
+                "genres": None,
+                "overview": None,
+                "backdrop_path": None,
+                "vote_average": None,
+                "release_year": None,
             }
             stats["errors"] += 1
 
@@ -122,11 +145,15 @@ def match_entries(entries: list[dict], conn: sqlite3.Connection, user_tag: str =
         # Insert new title (not INSERT OR REPLACE)
         cursor.execute(
             """INSERT INTO titles
-               (tmdb_id, tmdb_type, title_en, title_he, poster_path, original_language, confidence, match_status, source, user_tag)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'csv', ?)""",
+               (tmdb_id, tmdb_type, title_en, title_he, poster_path, original_language,
+                confidence, match_status, source, user_tag, genres,
+                overview, backdrop_path, vote_average, release_year)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'csv', ?, ?, ?, ?, ?, ?)""",
             (match["tmdb_id"], match["tmdb_type"], match["title_en"],
              match["title_he"], match["poster_path"], match.get("original_language"),
-             match["confidence"], match["match_status"], user_tag),
+             match["confidence"], match["match_status"], user_tag, match.get("genres"),
+             match.get("overview"), match.get("backdrop_path"),
+             match.get("vote_average"), match.get("release_year")),
         )
 
         # Get the title_id

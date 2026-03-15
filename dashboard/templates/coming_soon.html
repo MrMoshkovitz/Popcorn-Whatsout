@@ -4,64 +4,115 @@
 {% block title %}Coming Soon{% endblock %}
 
 {% block content %}
-{% if alerts %}
-<h2 class="section-title" dir="auto">Upcoming Seasons</h2>
+{% if timeline %}
 <div class="filter-bar" dir="auto">
     <input type="text" class="filter-search" id="cs-search" placeholder="Search upcoming..." dir="auto">
+    <div class="filter-pills" id="cs-type-filter">
+        <button class="filter-pill active" data-filter="all">All</button>
+        <button class="filter-pill" data-filter="tv">TV</button>
+        <button class="filter-pill" data-filter="movie">Movies</button>
+    </div>
     <div class="filter-pills" id="cs-tag-filter">
         <button class="filter-pill active" data-filter="all">All</button>
         <button class="filter-pill" data-filter="me">Me</button>
         <button class="filter-pill" data-filter="wife">Wife</button>
     </div>
 </div>
-<div class="poster-grid" id="cs-grid">
-    {% for alert in alerts %}
-    <div class="poster-card" data-title="{{ alert.title }}" data-tag="{{ alert.user_tag }}">
-        {% if alert.poster_path %}
-        <img class="poster-img" src="https://image.tmdb.org/t/p/w300{{ alert.poster_path }}"
-             alt="{{ alert.title }}" dir="auto">
-        {% else %}
-        <div class="poster-placeholder">&#127916;</div>
-        {% endif %}
 
-        {% if alert.air_date %}
-        {% if alert.days_until is not none and alert.days_until >= 0 %}
-        <span class="air-date-badge" dir="auto">{{ alert.days_until }} days</span>
-        {% else %}
-        <span class="air-date-badge" dir="auto">{{ alert.air_date }}</span>
-        {% endif %}
-        {% else %}
-        <span class="air-date-badge tba" dir="auto">TBA</span>
-        {% endif %}
+{# ── Timeline View (Phase 7) ────────────────────── #}
+{% for month, items in timeline.items() %}
+<div class="timeline-month cs-timeline-group">
+    <h3 class="timeline-label" dir="auto">{{ month }}</h3>
+    <div class="scroll-row">
+        {% for item in items %}
+        <div class="poster-card fade-in-up"
+             data-title="{{ item.title }}{% if item.collection_name is defined and item.collection_name %} {{ item.collection_name }}{% endif %}"
+             data-tag="{{ item.user_tag|default('all') }}"
+             data-type="{{ item.item_type }}"
+             data-overview="{{ item.overview|default('') }}"
+             data-stagger="{{ loop.index0 * 50 }}"
+             {% if item.tmdb_id is defined %}
+             onclick="Popcorn.openModal('{{ item.tmdb_type|default(item.item_type) }}', {{ item.tmdb_id }}, {title:'{{ item.title|e }}',poster_path:'{{ item.poster_path|default('') }}',backdrop_path:'{{ item.backdrop_path|default('') }}',overview:this.getAttribute('data-overview'),vote_average:{{ item.vote_average|default(0) }},release_year:'{{ item.release_year|default('') }}'{% if item.item_type == 'tv' %},total_seasons:{{ item.total_seasons|default(0) }},watched_seasons:{{ item.watched_season|default(0) }}{% endif %}})"
+             {% endif %}>
+            {% if item.poster_path %}
+            <img class="poster-img" src="https://image.tmdb.org/t/p/w300{{ item.poster_path }}"
+                 alt="{{ item.title }}" dir="auto" loading="lazy">
+            {% else %}
+            <div class="poster-placeholder">&#127916;</div>
+            {% endif %}
 
-        <div class="card-info">
-            <p class="card-title" dir="auto">{{ alert.title }}</p>
-            <p class="card-sub" dir="auto">
-                Season {{ alert.new_season }}
-                {% if alert.air_date %} — {{ alert.air_date }}{% endif %}
-            </p>
-            <p class="card-meta" dir="auto">
-                Watched S{{ alert.watched_season }}{% if alert.total_seasons > alert.new_season %} · {{ alert.total_seasons }} seasons total{% endif %}
-            </p>
-            {% if alert.providers %}
-            <div class="provider-row">
-                {% for provider in alert.providers %}
+            {# Rating badge #}
+            {% if item.vote_average is defined and item.vote_average %}
+            <span class="card-rating">{{ "%.1f"|format(item.vote_average) }}</span>
+            {% endif %}
+
+            {# Countdown badge #}
+            {% if item.is_returning is defined and item.is_returning %}
+            <span class="air-date-badge returning-badge" dir="auto">Returning</span>
+            {% elif item.days_until is not none and item.days_until >= 0 %}
+                {% if item.days_until <= 7 %}
+                <span class="air-date-badge countdown-soon" dir="auto">This week!</span>
+                {% elif item.days_until <= 30 %}
+                <span class="air-date-badge" dir="auto">In {{ item.days_until }} days</span>
+                {% else %}
+                <span class="air-date-badge" dir="auto">{{ item.air_date }}</span>
+                {% endif %}
+            {% elif item.air_date %}
+            <span class="air-date-badge" dir="auto">{{ item.air_date }}</span>
+            {% else %}
+            <span class="air-date-badge tba" dir="auto">TBA</span>
+            {% endif %}
+
+            <span class="poster-badge badge-{{ item.item_type }}">{{ item.item_type }}</span>
+
+            {% if item.providers is defined and item.providers %}
+            <div class="card-providers-overlay">
+                {% for provider in item.providers %}
                 {% if provider.provider_logo_path %}
                 <img src="https://image.tmdb.org/t/p/original{{ provider.provider_logo_path }}"
-                     alt="{{ provider.provider_name }}" dir="auto"
-                     title="{{ provider.provider_name }} ({{ provider.monetization_type }})">
+                     alt="{{ provider.provider_name }}" dir="auto" loading="lazy">
                 {% endif %}
                 {% endfor %}
             </div>
             {% endif %}
+
+            {# Hover overlay with description #}
+            {% if item.overview is defined and item.overview %}
+            <div class="hover-overlay">
+                <p class="hover-desc" dir="auto">{{ item.overview[:120] }}{% if item.overview|length > 120 %}...{% endif %}</p>
+            </div>
+            {% endif %}
+
+            <div class="card-info">
+                <p class="card-title" dir="auto">{{ item.title }}</p>
+                {% if item.item_type == 'tv' %}
+                <p class="card-sub" dir="auto">
+                    {% if item.is_returning %}
+                    New season expected
+                    {% else %}
+                    Season {{ item.new_season }}
+                    {% endif %}
+                </p>
+                <p class="card-meta" dir="auto">
+                    Watched S{{ item.watched_season }}{% if item.total_seasons > (item.new_season|default(0)) %} · {{ item.total_seasons }} seasons{% endif %}
+                </p>
+                {% else %}
+                <p class="card-sub" dir="auto">{{ item.collection_name }}</p>
+                <p class="card-meta collection-label" dir="auto">
+                    Part {{ item.watched_parts + 1 }} of {{ item.total_parts }}
+                </p>
+                {% endif %}
+            </div>
         </div>
+        {% endfor %}
     </div>
-    {% endfor %}
 </div>
-{% else %}
+{% endfor %}
+
+{% elif not tv_alerts and not franchise_alerts %}
 <div class="empty-state">
     <div class="icon">&#9989;</div>
-    <p dir="auto">No upcoming releases tracked yet.</p>
+    <p dir="auto">No upcoming releases tracked yet.<br>Add TV shows to your library to track new seasons!</p>
 </div>
 {% endif %}
 {% endblock %}
@@ -69,36 +120,51 @@
 {% block scripts %}
 <script>
 (function() {
-    var grid = document.getElementById('cs-grid');
     var searchInput = document.getElementById('cs-search');
+    var typeFilter = document.getElementById('cs-type-filter');
     var tagFilter = document.getElementById('cs-tag-filter');
-    if (!grid) return;
+    var groups = document.querySelectorAll('.cs-timeline-group');
+    if (!groups.length) return;
 
+    var activeType = 'all';
     var activeTag = 'all';
 
     function applyFilters() {
         var query = (searchInput ? searchInput.value : '').toLowerCase();
-        grid.querySelectorAll('.poster-card').forEach(function(card) {
-            var title = (card.getAttribute('data-title') || '').toLowerCase();
-            var tag = card.getAttribute('data-tag') || 'both';
-            var matchSearch = !query || title.indexOf(query) !== -1;
-            var matchTag = activeTag === 'all' || tag === activeTag || tag === 'both';
-            card.style.display = (matchSearch && matchTag) ? '' : 'none';
+        groups.forEach(function(group) {
+            var cards = group.querySelectorAll('.poster-card');
+            var anyVisible = false;
+            cards.forEach(function(card) {
+                var title = (card.getAttribute('data-title') || '').toLowerCase();
+                var type = card.getAttribute('data-type') || '';
+                var tag = card.getAttribute('data-tag') || 'all';
+                var matchSearch = !query || title.indexOf(query) !== -1;
+                var matchType = activeType === 'all' || type === activeType;
+                var matchTag = activeTag === 'all' || tag === activeTag || tag === 'both' || tag === 'all';
+                var visible = matchSearch && matchType && matchTag;
+                card.style.display = visible ? '' : 'none';
+                if (visible) anyVisible = true;
+            });
+            group.style.display = anyVisible ? '' : 'none';
         });
     }
 
     if (searchInput) searchInput.addEventListener('input', applyFilters);
 
-    if (tagFilter) {
-        tagFilter.addEventListener('click', function(e) {
+    function setupPills(container, callback) {
+        if (!container) return;
+        container.addEventListener('click', function(e) {
             var btn = e.target.closest('.filter-pill');
             if (!btn) return;
-            tagFilter.querySelectorAll('.filter-pill').forEach(function(b) { b.classList.remove('active'); });
+            container.querySelectorAll('.filter-pill').forEach(function(b) { b.classList.remove('active'); });
             btn.classList.add('active');
-            activeTag = btn.getAttribute('data-filter');
+            callback(btn.getAttribute('data-filter'));
             applyFilters();
         });
     }
+
+    setupPills(typeFilter, function(v) { activeType = v; });
+    setupPills(tagFilter, function(v) { activeTag = v; });
 })();
 </script>
 {% endblock %}

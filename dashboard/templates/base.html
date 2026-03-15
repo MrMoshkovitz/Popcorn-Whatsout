@@ -1,30 +1,34 @@
 <!DOCTYPE html>
-<html dir="auto" lang="he" data-theme="dark">
+<html dir="auto" lang="he">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title dir="auto">Popcorn — {% block title %}WhatsOut{% endblock %}</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-    <header class="container">
-        <nav>
-            <ul>
-                <li><strong class="brand" dir="auto"><span>Popcorn</span></strong></li>
-            </ul>
-            <ul>
-                <li><a href="/watch-next" dir="auto" {% if active_tab == 'watch-next' %}aria-current="page"{% endif %}>Watch Next</a></li>
-                <li><a href="/coming-soon" dir="auto" {% if active_tab == 'coming-soon' %}aria-current="page"{% endif %}>Coming Soon</a></li>
-                <li><a href="/library" dir="auto" {% if active_tab == 'library' %}aria-current="page"{% endif %}>Library</a></li>
+    <nav class="popcorn-nav">
+        <div class="nav-inner">
+            <a href="/" class="brand" dir="auto">Popcorn</a>
+            <ul class="nav-tabs">
+                <li><a href="/watch-next" dir="auto" class="{% if active_tab == 'watch-next' %}active{% endif %}">Watch Next</a></li>
+                <li><a href="/coming-soon" dir="auto" class="{% if active_tab == 'coming-soon' %}active{% endif %}">Coming Soon</a></li>
+                <li><a href="/library" dir="auto" class="{% if active_tab == 'library' %}active{% endif %}">Library</a></li>
                 {% if review_count is defined and review_count > 0 %}
-                <li><a href="/review" dir="auto"><small dir="auto">Review ({{ review_count }})</small></a></li>
+                <li><a href="/review" dir="auto" class="review-link">Review ({{ review_count }})</a></li>
                 {% endif %}
             </ul>
-        </nav>
-    </header>
+            <div class="nav-right">
+                <div class="tag-filter" dir="auto">
+                    <a href="?tag=all" class="tag-btn{% if active_tag == 'all' %} active{% endif %}">All</a>
+                    <a href="?tag=me" class="tag-btn tag-me{% if active_tag == 'me' %} active{% endif %}">Me</a>
+                    <a href="?tag=wife" class="tag-btn tag-wife{% if active_tag == 'wife' %} active{% endif %}">Wife</a>
+                </div>
+            </div>
+        </div>
+    </nav>
 
-    <main class="container">
+    <main class="popcorn-main">
         {% with messages = get_flashed_messages() %}
         {% if messages %}
         {% for message in messages %}
@@ -33,34 +37,260 @@
         {% endif %}
         {% endwith %}
 
-        <div class="tag-filter" dir="auto">
-            <a href="?tag=all" class="tag-btn{% if active_tag == 'all' %} active{% endif %}">All</a>
-            <a href="?tag=me" class="tag-btn tag-me{% if active_tag == 'me' %} active{% endif %}">Me</a>
-            <a href="?tag=wife" class="tag-btn tag-wife{% if active_tag == 'wife' %} active{% endif %}">Wife</a>
-        </div>
-
         {% block content %}{% endblock %}
     </main>
 
-    <footer class="container">
-        <small dir="auto">
+    <footer class="popcorn-footer">
+        <div dir="auto">
             {% if telegram_connected is defined %}
             Telegram: {% if telegram_connected %}Connected{% else %}Not connected — send /start to your bot{% endif %}
             &middot;
             {% endif %}
             <img src="https://www.themoviedb.org/assets/2/v4/logos/v2/blue_short-8e7b30f73a4020692ccca9c88bafe5dcb6f8a62a4c6bc55cd9ba82bb2cd95f6c.svg"
-                 alt="TMDB Logo" style="height: 1em; vertical-align: middle;">
+                 alt="TMDB Logo" loading="lazy">
             This product uses the TMDB API but is not endorsed or certified by TMDB.
-        </small>
+        </div>
+        <div class="footer-made">Made with Popcorn</div>
     </footer>
 
+    <!-- Mobile bottom nav (Phase 8) -->
+    <nav class="bottom-nav">
+        <a href="/watch-next" class="bottom-nav-item{% if active_tab == 'watch-next' %} active{% endif %}">
+            <span class="nav-icon">&#127871;</span>
+            <span dir="auto">Watch</span>
+        </a>
+        <a href="/coming-soon" class="bottom-nav-item{% if active_tab == 'coming-soon' %} active{% endif %}">
+            <span class="nav-icon">&#128197;</span>
+            <span dir="auto">Soon</span>
+        </a>
+        <a href="/library" class="bottom-nav-item{% if active_tab == 'library' %} active{% endif %}">
+            <span class="nav-icon">&#128218;</span>
+            <span dir="auto">Library</span>
+        </a>
+        <a href="/review" class="bottom-nav-item{% if active_tab == 'review' %} active{% endif %}">
+            <span class="nav-icon">&#128269;</span>
+            <span dir="auto">Review</span>
+        </a>
+    </nav>
+
+    <!-- Toast container (Phase 4) -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Detail modal (Phase 5) -->
+    <div class="detail-modal-overlay" id="detail-overlay">
+        <div class="detail-modal" id="detail-modal">
+            <button class="detail-close" id="detail-close">&times;</button>
+            <div id="detail-content"></div>
+        </div>
+    </div>
+
     <script>
+    /* ── Popcorn global namespace ─────────────────── */
+    var Popcorn = window.Popcorn || {};
+
+    /* ── Toast system (Phase 4) ──────────────────── */
+    Popcorn.toast = function(message, undoCallback) {
+        var container = document.getElementById('toast-container');
+        var toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.innerHTML = '<span dir="auto">' + message + '</span>';
+        if (undoCallback) {
+            var btn = document.createElement('button');
+            btn.className = 'toast-undo';
+            btn.textContent = 'Undo';
+            btn.onclick = function() {
+                undoCallback();
+                toast.classList.add('exiting');
+                setTimeout(function() { toast.remove(); }, 300);
+            };
+            toast.appendChild(btn);
+        }
+        container.appendChild(toast);
+        setTimeout(function() {
+            toast.classList.add('exiting');
+            setTimeout(function() { toast.remove(); }, 300);
+        }, 5000);
+    };
+
+    /* ── Detail modal (Phase 5) ──────────────────── */
+    var _detailCache = {};
+
+    Popcorn.openModal = function(tmdbType, tmdbId, preload) {
+        var overlay = document.getElementById('detail-overlay');
+        var content = document.getElementById('detail-content');
+        document.body.style.overflow = 'hidden';
+
+        // Show immediately with preloaded data
+        var backdropHtml = '';
+        if (preload.backdrop_path) {
+            backdropHtml = '<div class="detail-backdrop-wrap"><img src="https://image.tmdb.org/t/p/w1280' + preload.backdrop_path + '" alt="" loading="lazy"><div class="detail-gradient"></div></div>';
+        }
+        var ratingHtml = preload.vote_average ? '<span class="hero-rating">' + parseFloat(preload.vote_average).toFixed(1) + '</span>' : '';
+        var yearHtml = preload.release_year ? '<span class="hero-year">' + preload.release_year + '</span>' : '';
+        var typeHtml = '<span class="hero-type-badge badge-' + tmdbType + '">' + tmdbType + '</span>';
+
+        content.innerHTML = backdropHtml +
+            '<div class="detail-header"><h2 class="detail-title" dir="auto">' + (preload.title || '') + '</h2>' +
+            '<div class="detail-meta-row">' + ratingHtml + yearHtml + typeHtml + '</div></div>' +
+            '<div class="detail-body">' +
+            (preload.overview ? '<p class="detail-overview" dir="auto">' + preload.overview + '</p>' : '') +
+            '<div id="detail-extended"><div class="skeleton skeleton-text" style="margin-bottom:0.5rem"></div><div class="skeleton skeleton-text short"></div></div>' +
+            '</div>';
+
+        overlay.classList.add('open');
+
+        // Fetch extended data (cast, trailer, similar)
+        var cacheKey = tmdbType + '_' + tmdbId;
+        if (_detailCache[cacheKey]) {
+            _renderExtended(_detailCache[cacheKey], tmdbType, tmdbId, preload);
+        } else {
+            fetch('/api/detail/' + tmdbType + '/' + tmdbId)
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    _detailCache[cacheKey] = data;
+                    _renderExtended(data, tmdbType, tmdbId, preload);
+                })
+                .catch(function() {
+                    var ext = document.getElementById('detail-extended');
+                    if (ext) ext.innerHTML = '';
+                });
+        }
+    };
+
+    function _renderExtended(data, tmdbType, tmdbId, preload) {
+        var ext = document.getElementById('detail-extended');
+        if (!ext) return;
+        var html = '';
+
+        // Cast
+        if (data.cast && data.cast.length) {
+            html += '<div class="detail-section-label" dir="auto">Cast</div><div class="detail-cast-row">';
+            data.cast.forEach(function(c) {
+                var photo = c.profile_path ? 'https://image.tmdb.org/t/p/w185' + c.profile_path : '';
+                html += '<div class="detail-cast-item">';
+                if (photo) html += '<img src="' + photo + '" alt="' + c.name + '" loading="lazy">';
+                else html += '<div style="width:64px;height:64px;border-radius:50%;background:var(--border);margin:0 auto 0.3rem"></div>';
+                html += '<div class="cast-name" dir="auto">' + c.name + '</div></div>';
+            });
+            html += '</div>';
+        }
+
+        // Trailer
+        if (data.trailer_key) {
+            html += '<div class="detail-section-label" dir="auto">Trailer</div>' +
+                '<div class="detail-trailer"><iframe src="https://www.youtube.com/embed/' + data.trailer_key + '" allowfullscreen loading="lazy"></iframe></div>';
+        }
+
+        // Seasons (TV)
+        if (tmdbType === 'tv' && preload.total_seasons) {
+            var watched = parseInt(preload.watched_seasons) || 0;
+            var total = parseInt(preload.total_seasons) || 0;
+            if (total > 0) {
+                html += '<div class="detail-section-label" dir="auto">Seasons</div><div class="detail-seasons">';
+                for (var i = 1; i <= total; i++) {
+                    html += '<span class="detail-season-badge ' + (i <= watched ? 'watched' : 'unwatched') + '">S' + i + (i <= watched ? ' &#10003;' : '') + '</span>';
+                }
+                html += '</div>';
+            }
+        }
+
+        // Similar
+        if (data.similar && data.similar.length) {
+            html += '<div class="detail-section-label" dir="auto">Similar</div><div class="detail-similar-row">';
+            data.similar.forEach(function(s) {
+                if (!s.poster_path) return;
+                html += '<div class="mini-poster" onclick="Popcorn.openModal(\'' + (s.media_type || tmdbType) + '\',' + s.id + ',{title:\'' + (s.title || s.name || '').replace(/'/g, "\\'") + '\',poster_path:\'' + (s.poster_path || '') + '\',backdrop_path:\'' + (s.backdrop_path || '') + '\',overview:\'' + (s.overview || '').replace(/'/g, "\\'").replace(/\n/g, ' ').substring(0, 200) + '\',vote_average:' + (s.vote_average || 0) + ',release_year:\'' + ((s.release_date || s.first_air_date || '').substring(0, 4)) + '\'})">' +
+                    '<img src="https://image.tmdb.org/t/p/w200' + s.poster_path + '" alt="' + (s.title || s.name || '') + '" loading="lazy">' +
+                    '<p dir="auto">' + (s.title || s.name || '') + '</p></div>';
+            });
+            html += '</div>';
+        }
+
+        ext.innerHTML = html;
+    }
+
+    Popcorn.closeModal = function() {
+        document.getElementById('detail-overlay').classList.remove('open');
+        document.body.style.overflow = '';
+    };
+
+    document.getElementById('detail-close').addEventListener('click', Popcorn.closeModal);
+    document.getElementById('detail-overlay').addEventListener('click', function(e) {
+        if (e.target === this) Popcorn.closeModal();
+    });
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') Popcorn.closeModal();
+    });
+
+    /* ── Inline actions via fetch (Phase 4) ──────── */
+    Popcorn.dismiss = function(recId, card) {
+        fetch('/dismiss/' + recId, {
+            method: 'POST',
+            headers: { 'Accept': 'application/json' }
+        }).then(function(r) { return r.json(); }).then(function(data) {
+            if (data.ok) {
+                card.classList.add('card-exiting');
+                Popcorn.toast('Dismissed.', function() {
+                    fetch('/undismiss/' + recId, {
+                        method: 'POST',
+                        headers: { 'Accept': 'application/json' }
+                    }).then(function() {
+                        card.classList.remove('card-exiting');
+                        card.style.display = '';
+                    });
+                });
+                setTimeout(function() { card.style.display = 'none'; }, 350);
+            }
+        });
+    };
+
+    Popcorn.markWatched = function(recId, card) {
+        fetch('/api/mark-watched/' + recId, {
+            method: 'POST',
+            headers: { 'Accept': 'application/json' }
+        }).then(function(r) { return r.json(); }).then(function(data) {
+            if (data.ok) {
+                card.classList.add('card-exiting');
+                Popcorn.toast('Marked as watched.');
+                setTimeout(function() { card.style.display = 'none'; }, 350);
+            }
+        });
+    };
+
+    /* ── IntersectionObserver for fade-in (Phase 6) ─ */
+    if ('IntersectionObserver' in window && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        var observer = new IntersectionObserver(function(entries) {
+            entries.forEach(function(entry) {
+                if (entry.isIntersecting) {
+                    var delay = parseInt(entry.target.getAttribute('data-stagger')) || 0;
+                    setTimeout(function() {
+                        entry.target.classList.add('visible');
+                    }, delay);
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.1 });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.fade-in-up').forEach(function(el) {
+                observer.observe(el);
+            });
+        });
+    } else {
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.fade-in-up').forEach(function(el) {
+                el.classList.add('visible');
+            });
+        });
+    }
+
+    /* ── Autocomplete (existing) ─────────────────── */
     (function() {
         var inputs = document.querySelectorAll('.autocomplete-input');
         inputs.forEach(function(input) {
             var timer = null;
             var dropdown = document.createElement('div');
-            dropdown.style.cssText = 'position:absolute;background:var(--popcorn-card-bg,#1e2030);border:1px solid #2a2d42;border-radius:8px;z-index:100;max-height:300px;overflow-y:auto;display:none;width:100%';
+            dropdown.style.cssText = 'position:absolute;background:var(--surface,#161B22);border:1px solid var(--border,#30363D);border-radius:6px;z-index:100;max-height:300px;overflow-y:auto;display:none;width:100%';
             input.parentNode.style.position = 'relative';
             input.parentNode.appendChild(dropdown);
 
@@ -76,12 +306,12 @@
                             if (!items.length) { dropdown.style.display = 'none'; return; }
                             items.forEach(function(item) {
                                 var row = document.createElement('div');
-                                row.style.cssText = 'padding:0.5em 0.75em;cursor:pointer;display:flex;align-items:center;gap:0.6em;border-bottom:1px solid #2a2d42;transition:background 0.1s';
-                                row.onmouseover = function() { row.style.background = '#262840'; };
+                                row.style.cssText = 'padding:0.5em 0.75em;cursor:pointer;display:flex;align-items:center;gap:0.6em;border-bottom:1px solid var(--border,#30363D);transition:background 0.1s';
+                                row.onmouseover = function() { row.style.background = 'rgba(232,180,49,0.08)'; };
                                 row.onmouseout = function() { row.style.background = 'transparent'; };
-                                var img = item.poster_path ? '<img src="https://image.tmdb.org/t/p/w200' + item.poster_path + '" alt="" style="height:40px;width:27px;object-fit:cover;border-radius:3px">' : '';
-                                var badge = item.media_type === 'tv' ? 'TV' : 'Movie';
-                                row.innerHTML = img + '<span dir="auto">' + item.title + ' (' + (item.year || '?') + ') <small style="opacity:0.6">[' + badge + ']</small></span>';
+                                var img = item.poster_path ? '<img src="https://image.tmdb.org/t/p/w200' + item.poster_path + '" alt="" style="height:48px;width:32px;object-fit:cover;border-radius:4px">' : '';
+                                var badge = item.media_type === 'tv' ? '<span style="background:#238636;color:#fff;padding:1px 5px;border-radius:3px;font-size:0.65em;font-weight:700">TV</span>' : '<span style="background:#1F6FEB;color:#fff;padding:1px 5px;border-radius:3px;font-size:0.65em;font-weight:700">Movie</span>';
+                                row.innerHTML = img + '<span dir="auto" style="flex:1;overflow:hidden">' + item.title + ' <small style="opacity:0.5">(' + (item.year || '?') + ')</small> ' + badge + '</span>';
                                 row.addEventListener('click', function() {
                                     input.value = item.title;
                                     var form = input.closest('form');
@@ -91,7 +321,6 @@
                                         if (idField) idField.value = item.tmdb_id;
                                         if (typeField) typeField.value = item.media_type;
 
-                                        // Show/hide seasons input for TV shows
                                         var seasonsDiv = form.querySelector('#seasons-input');
                                         var seasonsField = form.querySelector('#watched_seasons');
                                         if (seasonsDiv && seasonsField) {

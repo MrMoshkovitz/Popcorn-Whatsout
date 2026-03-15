@@ -18,8 +18,8 @@ logger = logging.getLogger(__name__)
 bot = Bot(token=TELEGRAM_BOT_TOKEN) if TELEGRAM_BOT_TOKEN else None
 
 
-async def send_new_season_alert(bot, chat_id, title_name, season_number, provider_name=None, tmdb_id=None):
-    """Send new season notification with watched/remind inline keyboard."""
+async def send_new_season_alert(bot, chat_id, title_name, season_number, provider_name=None, tmdb_id=None, poster_path=None):
+    """Send new season notification with poster photo + inline keyboard."""
     text = f"<b>New Season!</b>\n{title_name} Season {season_number} is now available"
     if provider_name:
         text += f" on {provider_name}"
@@ -34,6 +34,18 @@ async def send_new_season_alert(bot, chat_id, title_name, season_number, provide
         ])
 
     try:
+        if poster_path:
+            try:
+                await bot.send_photo(
+                    chat_id=chat_id,
+                    photo=f"https://image.tmdb.org/t/p/w300{poster_path}",
+                    caption=text,
+                    parse_mode="HTML",
+                    reply_markup=keyboard
+                )
+                return
+            except telegram.error.TelegramError:
+                pass
         await bot.send_message(
             chat_id=chat_id,
             text=text,
@@ -44,12 +56,23 @@ async def send_new_season_alert(bot, chat_id, title_name, season_number, provide
         logger.error(f"Failed to send new season alert: {e}")
 
 
-async def send_recommendation(bot, chat_id, source_title, rec_titles, tmdb_id=None):
-    """Send recommendation notification."""
+async def send_recommendation(bot, chat_id, source_title, rec_titles, tmdb_id=None, poster_path=None):
+    """Send recommendation notification with optional poster."""
     rec_list = "\n".join(f"- {t}" for t in rec_titles)
-    text = f"<b>New Recommendation</b>\nBased on <i>{source_title}</i>, you might like:\n{rec_list}"
+    text = f"<b>New Recommendations</b>\nBased on <i>{source_title}</i>, you might like:\n{rec_list}"
 
     try:
+        if poster_path:
+            try:
+                await bot.send_photo(
+                    chat_id=chat_id,
+                    photo=f"https://image.tmdb.org/t/p/w300{poster_path}",
+                    caption=text,
+                    parse_mode="HTML"
+                )
+                return
+            except telegram.error.TelegramError:
+                pass
         await bot.send_message(
             chat_id=chat_id,
             text=text,
@@ -89,6 +112,32 @@ async def send_disambiguation(bot, chat_id, raw_title, candidates, title_id):
         )
     except telegram.error.TelegramError as e:
         logger.error(f"Failed to send disambiguation: {e}")
+
+
+async def send_weekly_digest(bot, chat_id, stats):
+    """Send weekly digest with summary stats."""
+    text = "<b>\U0001f37f Weekly Popcorn Digest</b>\n\n"
+
+    if stats.get('new_recs'):
+        text += f"<b>New recommendations:</b> {stats['new_recs']}\n"
+    if stats.get('coming_soon'):
+        text += f"<b>Coming soon:</b> {stats['coming_soon']} titles\n"
+    if stats.get('new_titles'):
+        text += f"<b>Added this week:</b> {stats['new_titles']} titles\n"
+
+    if not stats.get('new_recs') and not stats.get('coming_soon') and not stats.get('new_titles'):
+        text += "No new activity this week. Check your dashboard for recommendations!"
+
+    text += "\n\U0001f449 Open your Popcorn dashboard for details."
+
+    try:
+        await bot.send_message(
+            chat_id=chat_id,
+            text=text,
+            parse_mode="HTML"
+        )
+    except telegram.error.TelegramError as e:
+        logger.error(f"Failed to send weekly digest: {e}")
 
 
 async def send_admin_alert(bot, chat_id, error_message):

@@ -10,6 +10,11 @@ CREATE TABLE IF NOT EXISTS titles (
     match_status TEXT DEFAULT 'auto' CHECK(match_status IN ('auto', 'review', 'manual')),
     source TEXT DEFAULT 'csv' CHECK(source IN ('csv', 'manual')),
     user_tag TEXT DEFAULT 'both' CHECK(user_tag IN ('me', 'wife', 'both')),
+    genres TEXT,
+    overview TEXT,
+    backdrop_path TEXT,
+    vote_average REAL,
+    release_year TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(tmdb_id, tmdb_type)
 );
@@ -34,6 +39,7 @@ CREATE TABLE IF NOT EXISTS series_tracking (
     status TEXT DEFAULT 'watching' CHECK(status IN ('watching', 'completed', 'dropped')),
     next_season_air_date TEXT,
     total_episodes_tmdb INTEGER,
+    returning_series INTEGER DEFAULT 0,
     UNIQUE(title_id)
 );
 
@@ -45,6 +51,11 @@ CREATE TABLE IF NOT EXISTS recommendations (
     recommended_title TEXT,
     poster_path TEXT,
     tmdb_recommendation_score REAL,
+    collection_name TEXT,
+    genres TEXT,
+    overview TEXT,
+    backdrop_path TEXT,
+    release_year TEXT,
     status TEXT DEFAULT 'unseen' CHECK(status IN ('unseen', 'dismissed', 'watched')),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(source_title_id, recommended_tmdb_id)
@@ -66,6 +77,20 @@ CREATE TABLE IF NOT EXISTS settings (
     value TEXT
 );
 
+CREATE TABLE IF NOT EXISTS franchise_tracking (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    collection_id INTEGER NOT NULL UNIQUE,
+    collection_name TEXT,
+    total_parts INTEGER,
+    watched_parts INTEGER DEFAULT 0,
+    next_unreleased_tmdb_id INTEGER,
+    next_unreleased_title TEXT,
+    next_unreleased_poster TEXT,
+    next_release_date TEXT,
+    last_checked TIMESTAMP,
+    source_title_ids TEXT
+);
+
 CREATE TABLE IF NOT EXISTS schema_migrations (
     filename TEXT PRIMARY KEY,
     applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -75,3 +100,4 @@ CREATE INDEX IF NOT EXISTS idx_watch_history_title ON watch_history(title_id);
 CREATE INDEX IF NOT EXISTS idx_series_tracking_status ON series_tracking(status);
 CREATE INDEX IF NOT EXISTS idx_recommendations_status ON recommendations(status);
 CREATE INDEX IF NOT EXISTS idx_streaming_tmdb ON streaming_availability(tmdb_id, tmdb_type);
+CREATE INDEX IF NOT EXISTS idx_franchise_collection ON franchise_tracking(collection_id);

@@ -5,6 +5,30 @@
 
 {% block content %}
 {% if titles %}
+{# ── Stats Bar (Phase 7) ────────────────────────── #}
+{% if stats.total > 0 %}
+<div class="stats-bar">
+    <div class="stat-item">
+        <div class="stat-num" dir="auto">{{ stats.total }}</div>
+        <div class="stat-label" dir="auto">Total</div>
+    </div>
+    <div class="stat-item">
+        <div class="stat-num" dir="auto">{{ stats.tv }}</div>
+        <div class="stat-label" dir="auto">TV Shows</div>
+    </div>
+    <div class="stat-item">
+        <div class="stat-num" dir="auto">{{ stats.movies }}</div>
+        <div class="stat-label" dir="auto">Movies</div>
+    </div>
+    {% if stats.since %}
+    <div class="stat-item">
+        <div class="stat-num" dir="auto">{{ stats.since }}</div>
+        <div class="stat-label" dir="auto">Since</div>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
 <h2 class="section-title" dir="auto">Your Library</h2>
 <div class="filter-bar" dir="auto">
     <input type="text" class="filter-search" id="lib-search" placeholder="Search library..." dir="auto">
@@ -27,26 +51,36 @@
 <div class="poster-grid" id="lib-grid">
     {% for title in titles %}
     {% set display_name = (title.title_en or title.title_he) if title.original_language != 'he' else (title.title_he or title.title_en) %}
-    <div class="poster-card"
+    {% set genres_list = [] %}
+    {% if title.genres %}{% set genres_list = title.genres | tojson | default('[]') %}{% endif %}
+    <div class="poster-card fade-in-up"
          data-title="{{ display_name }}"
          data-type="{{ title.tmdb_type }}"
          data-tag="{{ title.user_tag or 'both' }}"
          data-watched="{{ title.last_watched or '' }}"
-         data-id="{{ title.id }}">
+         data-id="{{ title.id }}"
+         data-tmdb-id="{{ title.tmdb_id }}" data-tmdb-type="{{ title.tmdb_type }}"
+         data-overview="{{ title.overview or '' }}" data-backdrop-path="{{ title.backdrop_path or '' }}"
+         data-vote-average="{{ title.vote_average or '' }}" data-release-year="{{ title.release_year or '' }}"
+         data-stagger="{{ loop.index0 * 30 }}"
+         onclick="Popcorn.openModal('{{ title.tmdb_type }}', {{ title.tmdb_id }}, {title:'{{ display_name|e }}',poster_path:'{{ title.poster_path or '' }}',backdrop_path:'{{ title.backdrop_path or '' }}',overview:this.getAttribute('data-overview'),vote_average:{{ title.vote_average or 0 }},release_year:'{{ title.release_year or '' }}'{% if title.tmdb_type == 'tv' %},total_seasons:{{ title.total_seasons_tmdb or 0 }},watched_seasons:{{ title.max_watched_season or 0 }}{% endif %}})">
         {% if title.poster_path %}
         <img class="poster-img" src="https://image.tmdb.org/t/p/w300{{ title.poster_path }}"
-             alt="{{ display_name }}" dir="auto">
+             alt="{{ display_name }}" dir="auto" loading="lazy">
         {% else %}
         <div class="poster-placeholder">&#127916;</div>
         {% endif %}
 
+        {% if title.vote_average %}
+        <span class="card-rating">{{ "%.1f"|format(title.vote_average) }}</span>
+        {% endif %}
         <span class="poster-badge badge-{{ title.tmdb_type }}" dir="auto">{{ title.tmdb_type }}</span>
 
         <div class="hover-overlay">
-            <a href="/edit/{{ title.id }}" class="btn-sm btn-edit">Edit</a>
+            <a href="/edit/{{ title.id }}" class="btn-sm btn-edit" onclick="event.stopPropagation()">Edit</a>
             <form method="post" action="/delete/{{ title.id }}"
-                  onsubmit="return confirm('Delete this title and all related data?')">
-                <button type="submit" class="btn-sm btn-delete">Delete</button>
+                  onsubmit="event.stopPropagation(); return confirm('Delete this title and all related data?')">
+                <button type="submit" class="btn-sm btn-delete" onclick="event.stopPropagation()">Delete</button>
             </form>
         </div>
 
@@ -57,8 +91,16 @@
                 S{{ title.max_watched_season }}/{{ title.total_seasons_tmdb or '?' }} seasons
                 {% if title.total_episodes_tmdb %} · {{ title.watch_count }}/{{ title.total_episodes_tmdb }} eps{% endif %}
             </p>
+            {% if title.total_seasons_tmdb and title.max_watched_season is not none %}
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: {{ (title.max_watched_season / title.total_seasons_tmdb * 100)|int }}%"></div>
+            </div>
+            {% endif %}
             {% else %}
             <p class="card-sub" dir="auto">{{ title.watch_count }} entr{{ 'y' if title.watch_count == 1 else 'ies' }}{% if title.last_watched %} · {{ title.last_watched }}{% endif %}</p>
+            {% endif %}
+            {% if title.release_year %}
+            <p class="card-year-genre" dir="auto">{{ title.release_year }}</p>
             {% endif %}
             <div style="margin-top:0.2rem;">
                 <span class="tag-badge tag-{{ title.user_tag or 'both' }}">{{ title.user_tag or 'both' }}</span>
@@ -77,7 +119,7 @@
 {% else %}
 <div class="empty-state">
     <div class="icon">&#128218;</div>
-    <p dir="auto">Your library is empty. Upload a CSV or add titles manually.</p>
+    <p dir="auto">Your library is empty. Upload a CSV or add titles manually to get started!</p>
 </div>
 {% endif %}
 

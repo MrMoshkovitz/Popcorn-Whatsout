@@ -13,6 +13,9 @@
     --tag-both: #BC8CFF;
     --badge-tv: #238636;
     --badge-movie: #1F6FEB;
+    --match-high: #238636;
+    --match-mid: #E8B431;
+    --match-low: #8B949E;
     --radius: 10px;
     --radius-sm: 6px;
     --transition: 0.2s ease;
@@ -23,6 +26,7 @@ body {
     background: var(--bg);
     color: var(--text);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    margin: 0;
 }
 
 a { color: var(--accent); }
@@ -168,7 +172,135 @@ a:hover { color: #f0c454; }
 
 .section-title:first-child { margin-top: 0; }
 
-/* ── Hero (Watch Next) ───────────────────────────── */
+/* ── Hero Banner (Phase 2) ──────────────────────── */
+.hero-banner {
+    position: relative;
+    width: 100%;
+    height: 420px;
+    overflow: hidden;
+    border-radius: var(--radius);
+    margin-bottom: 2rem;
+}
+
+.hero-slide {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 0.8s ease;
+}
+
+.hero-slide.active { opacity: 1; }
+
+.hero-backdrop {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.hero-gradient {
+    position: absolute;
+    inset: 0;
+    background:
+        linear-gradient(to right, rgba(13,17,23,0.95) 0%, rgba(13,17,23,0.4) 50%, transparent 100%),
+        linear-gradient(to top, rgba(13,17,23,1) 0%, transparent 50%);
+}
+
+.hero-content {
+    position: absolute;
+    bottom: 2.5rem;
+    left: 2rem;
+    right: 40%;
+    z-index: 2;
+}
+
+.hero-content h2 {
+    font-size: 1.8em;
+    font-weight: 700;
+    margin: 0 0 0.5rem;
+    line-height: 1.2;
+}
+
+.hero-overview {
+    font-size: 0.88em;
+    color: rgba(240,246,252,0.8);
+    margin: 0 0 0.75rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-height: 1.5;
+}
+
+.hero-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+.hero-rating {
+    background: rgba(232,180,49,0.9);
+    color: var(--bg);
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-size: 0.82em;
+    font-weight: 700;
+}
+
+.hero-year {
+    color: var(--text-muted);
+    font-size: 0.82em;
+}
+
+.genre-pill {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.72em;
+    font-weight: 600;
+    background: rgba(255,255,255,0.1);
+    color: var(--text);
+    backdrop-filter: blur(4px);
+}
+
+.hero-type-badge {
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-size: 0.72em;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.hero-type-badge.badge-movie { background: var(--badge-movie); color: #fff; }
+.hero-type-badge.badge-tv { background: var(--badge-tv); color: #fff; }
+
+.hero-dots {
+    position: absolute;
+    bottom: 1rem;
+    right: 2rem;
+    display: flex;
+    gap: 6px;
+    z-index: 3;
+}
+
+.hero-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.3);
+    cursor: pointer;
+    transition: all 0.3s;
+    border: none;
+    padding: 0;
+}
+
+.hero-dot.active {
+    background: var(--accent);
+    width: 24px;
+    border-radius: 4px;
+}
+
+/* Old hero fallback */
 .hero {
     text-align: center;
     padding: 2rem 1rem 1rem;
@@ -217,13 +349,14 @@ a:hover { color: #f0c454; }
     gap: 1.25rem;
 }
 
-/* ── Poster card ─────────────────────────────────── */
+/* ── Poster card (Phase 3 redesign) ──────────────── */
 .poster-card {
     background: var(--surface);
     border-radius: var(--radius);
     overflow: hidden;
     transition: transform var(--transition), box-shadow var(--transition);
     position: relative;
+    cursor: pointer;
 }
 
 .poster-card:hover {
@@ -278,6 +411,64 @@ a:hover { color: #f0c454; }
     margin: 0.15rem 0 0;
 }
 
+.poster-card .card-year-genre {
+    font-size: 0.7em;
+    color: var(--text-muted);
+    margin: 0.1rem 0 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── Card rating badge (Phase 3) ─────────────────── */
+.card-rating {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    background: rgba(232,180,49,0.92);
+    color: var(--bg);
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 0.68em;
+    font-weight: 700;
+    backdrop-filter: blur(4px);
+    z-index: 2;
+}
+
+/* ── Card providers overlay on poster (Phase 3) ──── */
+.card-providers-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(transparent, rgba(0,0,0,0.75));
+    padding: 1.2rem 6px 4px;
+    display: flex;
+    gap: 3px;
+    z-index: 2;
+}
+
+.card-providers-overlay img {
+    height: 18px;
+    width: 18px;
+    border-radius: 3px;
+    object-fit: cover;
+}
+
+/* ── Match % badge (Phase 9) ─────────────────────── */
+.match-badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 0.68em;
+    font-weight: 700;
+    color: #fff;
+}
+
+.match-badge.match-high { background: var(--match-high); }
+.match-badge.match-mid { background: var(--match-mid); color: var(--bg); }
+.match-badge.match-low { background: var(--match-low); }
+
 /* ── Poster badges (overlays on poster image) ────── */
 .poster-badge {
     position: absolute;
@@ -289,6 +480,7 @@ a:hover { color: #f0c454; }
     font-weight: 700;
     text-transform: uppercase;
     backdrop-filter: blur(4px);
+    z-index: 2;
 }
 
 .poster-badge.badge-tv { background: var(--badge-tv); color: #fff; }
@@ -331,6 +523,7 @@ a:hover { color: #f0c454; }
     font-size: 0.65em;
     font-weight: 700;
     backdrop-filter: blur(4px);
+    z-index: 2;
 }
 
 .air-date-badge.tba {
@@ -338,11 +531,16 @@ a:hover { color: #f0c454; }
     color: #fff;
 }
 
-/* ── Hover overlay (card actions) ────────────────── */
+.air-date-badge.countdown-soon {
+    background: var(--match-high);
+    color: #fff;
+}
+
+/* ── Hover overlay with description (Phase 3) ────── */
 .poster-card .hover-overlay {
     position: absolute;
     inset: 0;
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(0, 0, 0, 0.75);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -350,10 +548,23 @@ a:hover { color: #f0c454; }
     gap: 0.5rem;
     opacity: 0;
     transition: opacity 0.25s ease;
-    padding: 0.5rem;
+    padding: 0.75rem;
+    z-index: 3;
 }
 
 .poster-card:hover .hover-overlay { opacity: 1; }
+
+.hover-overlay .hover-desc {
+    font-size: 0.72em;
+    color: rgba(255,255,255,0.85);
+    text-align: center;
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-height: 1.4;
+    margin-bottom: 0.25rem;
+}
 
 .hover-overlay .btn-sm {
     display: inline-block;
@@ -373,6 +584,12 @@ a:hover { color: #f0c454; }
     border: 1px solid rgba(255,255,255,0.25);
 }
 .hover-overlay .btn-dismiss:hover { background: rgba(255,255,255,0.25); }
+
+.hover-overlay .btn-watched {
+    background: var(--match-high);
+    color: #fff;
+}
+.hover-overlay .btn-watched:hover { background: #2ea043; }
 
 .hover-overlay .btn-edit {
     background: var(--accent);
@@ -478,6 +695,436 @@ a:hover { color: #f0c454; }
     padding: 0.35rem 0.5rem;
     font-size: 0.78em;
     cursor: pointer;
+}
+
+/* ── Genre sections ─────────────────────────────── */
+.genre-section {
+    margin-bottom: 1.5rem;
+}
+
+.genre-section .section-title {
+    margin-top: 1rem;
+}
+
+.collection-label {
+    font-size: 0.7em;
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.returning-badge {
+    background: rgba(35, 134, 54, 0.9) !important;
+    color: #fff !important;
+}
+
+/* ── Genre/Provider pills overflow ──────────────── */
+.genre-pills,
+.provider-pills {
+    flex-wrap: wrap;
+}
+
+.sort-select {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    border-radius: var(--radius-sm);
+    padding: 0.35rem 0.5rem;
+    font-size: 0.78em;
+    cursor: pointer;
+}
+
+/* ── Toast Notifications (Phase 4) ──────────────── */
+@keyframes toast-in {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes toast-out {
+    from { transform: translateX(0); opacity: 1; }
+    to { transform: translateX(100%); opacity: 0; }
+}
+
+@keyframes card-exit {
+    from { opacity: 1; transform: scale(1); }
+    to { opacity: 0; transform: scale(0.85); }
+}
+
+.toast-container {
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    pointer-events: none;
+}
+
+.toast {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.8rem 1.2rem;
+    font-size: 0.88em;
+    color: var(--text);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    animation: toast-in 0.3s ease-out;
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    max-width: 380px;
+}
+
+.toast.exiting { animation: toast-out 0.3s ease-in forwards; }
+
+.toast-undo {
+    color: var(--accent);
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    background: none;
+    border: none;
+    font-size: 1em;
+    padding: 0;
+}
+
+.toast-undo:hover { color: #f0c454; }
+
+.card-exiting {
+    animation: card-exit 0.35s ease forwards;
+    pointer-events: none;
+}
+
+/* ── Detail Modal (Phase 5) ──────────────────────── */
+.detail-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    z-index: 300;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+
+.detail-modal-overlay.open {
+    display: flex;
+    opacity: 1;
+}
+
+.detail-modal {
+    background: var(--surface);
+    border-radius: var(--radius);
+    max-width: 800px;
+    width: 90vw;
+    max-height: 85vh;
+    overflow-y: auto;
+    position: relative;
+}
+
+.detail-modal::-webkit-scrollbar { width: 4px; }
+.detail-modal::-webkit-scrollbar-track { background: transparent; }
+.detail-modal::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.detail-close {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    z-index: 10;
+    background: rgba(0,0,0,0.5);
+    border: none;
+    color: #fff;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    font-size: 1.2em;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+
+.detail-close:hover { background: rgba(0,0,0,0.8); }
+
+.detail-backdrop-wrap {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    border-radius: var(--radius) var(--radius) 0 0;
+}
+
+.detail-backdrop-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.detail-backdrop-wrap .detail-gradient {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, var(--surface) 0%, transparent 60%);
+}
+
+.detail-header {
+    padding: 0 1.5rem;
+    margin-top: -3rem;
+    position: relative;
+    z-index: 2;
+}
+
+.detail-title {
+    font-size: 1.6em;
+    font-weight: 700;
+    margin: 0 0 0.5rem;
+}
+
+.detail-meta-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+
+.detail-body {
+    padding: 0 1.5rem 1.5rem;
+}
+
+.detail-overview {
+    font-size: 0.92em;
+    color: rgba(240,246,252,0.85);
+    line-height: 1.6;
+    margin-bottom: 1.5rem;
+}
+
+.detail-section-label {
+    font-size: 0.78em;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.4rem;
+}
+
+.detail-cast-row {
+    display: flex;
+    gap: 1rem;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.detail-cast-item {
+    flex-shrink: 0;
+    text-align: center;
+    width: 80px;
+}
+
+.detail-cast-item img {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-bottom: 0.3rem;
+}
+
+.detail-cast-item .cast-name {
+    font-size: 0.72em;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.detail-trailer {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    margin-bottom: 1.5rem;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.detail-trailer iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+
+.detail-seasons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+}
+
+.detail-season-badge {
+    padding: 4px 12px;
+    border-radius: 4px;
+    font-size: 0.78em;
+    font-weight: 600;
+}
+
+.detail-season-badge.watched {
+    background: var(--match-high);
+    color: #fff;
+}
+
+.detail-season-badge.unwatched {
+    background: var(--border);
+    color: var(--text-muted);
+}
+
+.detail-similar-row {
+    display: flex;
+    gap: 0.75rem;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+}
+
+.detail-similar-row .mini-poster {
+    flex-shrink: 0;
+    width: 80px;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.detail-similar-row .mini-poster:hover { transform: scale(1.08); }
+
+.detail-similar-row .mini-poster img {
+    width: 100%;
+    aspect-ratio: 2 / 3;
+    object-fit: cover;
+    border-radius: var(--radius-sm);
+}
+
+.detail-similar-row .mini-poster p {
+    font-size: 0.68em;
+    color: var(--text-muted);
+    margin: 0.2rem 0 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── Skeleton loading (Phase 6) ──────────────────── */
+@keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+.skeleton {
+    background: linear-gradient(90deg, var(--border) 25%, #3a3f47 50%, var(--border) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: var(--radius-sm);
+}
+
+.skeleton-card {
+    width: 100%;
+    aspect-ratio: 2 / 3;
+}
+
+.skeleton-text {
+    height: 0.8em;
+    width: 70%;
+    margin: 0.3rem 0;
+}
+
+.skeleton-text.short { width: 40%; }
+
+/* ── Scroll fade-in animations (Phase 6) ─────────── */
+.fade-in-up {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.fade-in-up.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* ── Timeline (Phase 7 Coming Soon) ──────────────── */
+.timeline-month {
+    margin-bottom: 2rem;
+    padding-left: 1.5rem;
+    border-left: 2px solid var(--border);
+    position: relative;
+}
+
+.timeline-label {
+    font-size: 1em;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 0.75rem;
+    position: relative;
+}
+
+.timeline-label::before {
+    content: '';
+    position: absolute;
+    left: -1.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--accent);
+}
+
+/* ── Stats bar (Phase 7 Library) ─────────────────── */
+.stats-bar {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.stat-item {
+    flex: 1;
+    min-width: 100px;
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 1rem;
+    text-align: center;
+}
+
+.stat-num {
+    font-size: 1.8em;
+    font-weight: 700;
+    color: var(--accent);
+    line-height: 1;
+}
+
+.stat-label {
+    font-size: 0.72em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 0.3rem;
+}
+
+/* ── Progress bar (Phase 7 TV cards) ─────────────── */
+.progress-bar {
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    margin-top: 0.3rem;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.3s ease;
 }
 
 /* ── Empty state ─────────────────────────────────── */
@@ -774,32 +1421,112 @@ a:hover { color: #f0c454; }
     opacity: 0.5;
 }
 
+/* ── Mobile bottom nav (Phase 8) ─────────────────── */
+.bottom-nav {
+    display: none;
+}
+
 /* ── Responsive ──────────────────────────────────── */
+@media (max-width: 768px) {
+    /* Mobile bottom nav */
+    .bottom-nav {
+        display: flex;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 60;
+        background: rgba(13,17,23,0.95);
+        backdrop-filter: blur(12px);
+        border-top: 1px solid var(--border);
+        padding: 0.4rem 0;
+        justify-content: space-around;
+    }
+
+    .bottom-nav-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-decoration: none;
+        color: var(--text-muted);
+        font-size: 0.65em;
+        font-weight: 600;
+        padding: 0.3rem 0.5rem;
+        transition: color var(--transition);
+    }
+
+    .bottom-nav-item .nav-icon {
+        font-size: 1.4em;
+        margin-bottom: 0.15rem;
+    }
+
+    .bottom-nav-item.active {
+        color: var(--accent);
+    }
+
+    .nav-tabs { display: none; }
+
+    .popcorn-main {
+        padding-bottom: 5rem;
+    }
+
+    /* Hero banner mobile */
+    .hero-banner { height: 280px; }
+    .hero-content {
+        left: 1rem;
+        right: 1rem;
+        bottom: 1.5rem;
+    }
+    .hero-content h2 { font-size: 1.2em; }
+    .hero-overview { -webkit-line-clamp: 2; font-size: 0.8em; }
+
+    /* Detail modal becomes bottom sheet */
+    .detail-modal-overlay {
+        align-items: flex-end;
+    }
+    .detail-modal {
+        width: 100vw;
+        max-width: 100vw;
+        max-height: 85vh;
+        border-radius: var(--radius) var(--radius) 0 0;
+    }
+
+    /* Grid adjustments */
+    .poster-grid {
+        grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+        gap: 0.75rem;
+    }
+
+    .scroll-row .poster-card { width: 130px; }
+
+    /* Toast position */
+    .toast-container {
+        left: 1rem;
+        right: 1rem;
+        bottom: 5rem;
+    }
+    .toast { max-width: 100%; }
+
+    /* Stats bar */
+    .stats-bar { gap: 0.5rem; }
+    .stat-item { min-width: 70px; padding: 0.6rem; }
+    .stat-num { font-size: 1.4em; }
+}
+
 @media (max-width: 576px) {
     .popcorn-nav .nav-inner {
         flex-wrap: wrap;
         gap: 0.5rem;
     }
 
-    .nav-tabs a { padding: 0.3rem 0.7rem; font-size: 0.78em; }
-
-    .poster-grid {
-        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-        gap: 0.75rem;
-    }
-
-    .scroll-row .poster-card { width: 130px; }
-
     .review-card { flex-direction: column; }
     .review-card .review-poster { width: 80px; min-width: 80px; }
-
-    .hero h1 { font-size: 1.2em; }
 
     .filter-bar { gap: 0.5rem; }
     .filter-search { min-width: 100%; }
 }
 
-@media (min-width: 768px) {
+@media (min-width: 769px) {
     .poster-grid {
         grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
     }
@@ -809,4 +1536,15 @@ a:hover { color: #f0c454; }
     .poster-grid {
         grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
     }
+}
+
+/* ── Reduced motion ──────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+    .hero-slide { transition: none; }
+    .fade-in-up { opacity: 1; transform: none; transition: none; }
+    .toast { animation: none; }
+    .card-exiting { animation: none; opacity: 0; }
+    .skeleton { animation: none; }
+    .poster-card { transition: none; }
+    .poster-card:hover { transform: none; }
 }

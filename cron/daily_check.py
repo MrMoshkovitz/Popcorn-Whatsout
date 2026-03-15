@@ -1,7 +1,8 @@
 """Daily cron orchestrator for Popcorn.
 
-Runs 5 phases sequentially:
+Runs 6 phases sequentially:
 1. Check new seasons
+1b. Check movie franchises
 2. Refresh streaming availability
 3. Generate recommendations (Monday only)
 4. Timeout stale disambiguations
@@ -58,7 +59,8 @@ def _run_phase_1_new_seasons(consecutive_errors):
                             asyncio.run(send_new_season_alert(
                                 bot, chat_id,
                                 title_name, alert['new_season'],
-                                tmdb_id=alert.get('tmdb_id')
+                                tmdb_id=alert.get('tmdb_id'),
+                                poster_path=alert.get('poster_path')
                             ))
                         except Exception as e:
                             logging.error(f"Phase 1: Failed to send alert for {title_name}: {e}")
@@ -68,6 +70,28 @@ def _run_phase_1_new_seasons(consecutive_errors):
     except Exception as e:
         consecutive_errors += 1
         logging.error(f"Phase 1 failed: {e}")
+    return consecutive_errors
+
+
+def _run_phase_1b_franchises(consecutive_errors):
+    """Phase 1b: Check movie franchises for unreleased parts."""
+    logging.info("Phase 1b: Checking movie franchises...")
+    phase_start = time.time()
+    try:
+        from engine.franchise_checker import check_franchises
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        try:
+            alerts = check_franchises(conn)
+            logging.info(
+                f"Phase 1b complete: {len(alerts)} franchises with unreleased parts "
+                f"({time.time() - phase_start:.1f}s)"
+            )
+        finally:
+            conn.close()
+    except Exception as e:
+        consecutive_errors += 1
+        logging.error(f"Phase 1b failed: {e}")
     return consecutive_errors
 
 
@@ -173,6 +197,58 @@ def _run_phase_4_disambiguation(consecutive_errors):
     return consecutive_errors
 
 
+def _run_phase_5b_weekly_digest(consecutive_errors):
+    """Phase 5b: Send weekly digest (Sunday only)."""
+    if datetime.today().weekday() != 6:
+        logging.info("Phase 5b: Skipping weekly digest - not Sunday")
+        return consecutive_errors
+
+    logging.info("Phase 5b: Sending weekly digest...")
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        try:
+            # Count new recs this week
+            new_recs = conn.execute(
+                "SELECT COUNT(*) FROM recommendations WHERE status = 'unseen' "
+                "AND created_at >= date('now', '-7 days')"
+            ).fetchone()[0]
+
+            # Count coming soon
+            coming_soon = conn.execute(
+                "SELECT COUNT(*) FROM series_tracking WHERE status = 'watching' "
+                "AND next_season_air_date IS NOT NULL"
+            ).fetchone()[0]
+            franchise_soon = conn.execute(
+                "SELECT COUNT(*) FROM franchise_tracking WHERE next_unreleased_tmdb_id IS NOT NULL"
+            ).fetchone()[0]
+
+            # Count new titles
+            new_titles = conn.execute(
+                "SELECT COUNT(*) FROM titles WHERE created_at >= date('now', '-7 days')"
+            ).fetchone()[0]
+
+            stats = {
+                'new_recs': new_recs,
+                'coming_soon': coming_soon + franchise_soon,
+                'new_titles': new_titles,
+            }
+
+            from bot.telegram_notifier import send_weekly_digest, bot
+            chat_id = _get_chat_id()
+            if bot and chat_id:
+                asyncio.run(send_weekly_digest(bot, chat_id, stats))
+                logging.info(f"Phase 5b complete: digest sent")
+            else:
+                logging.info("Phase 5b: No bot/chat_id configured, skipping")
+        finally:
+            conn.close()
+    except Exception as e:
+        consecutive_errors += 1
+        logging.error(f"Phase 5b failed: {e}")
+    return consecutive_errors
+
+
 def _run_phase_5_error_check(consecutive_errors):
     """Phase 5: Send admin alert if too many errors occurred."""
     logging.info("Phase 5: Error check...")
@@ -223,9 +299,11 @@ def daily_check():
 
     consecutive_errors = 0
     consecutive_errors = _run_phase_1_new_seasons(consecutive_errors)
+    consecutive_errors = _run_phase_1b_franchises(consecutive_errors)
     consecutive_errors = _run_phase_2_availability(consecutive_errors)
     consecutive_errors = _run_phase_3_recommendations(consecutive_errors)
     consecutive_errors = _run_phase_4_disambiguation(consecutive_errors)
+    consecutive_errors = _run_phase_5b_weekly_digest(consecutive_errors)
     _run_phase_5_error_check(consecutive_errors)
 
     logging.info(f"Daily check completed in {time.time() - start:.1f}s")

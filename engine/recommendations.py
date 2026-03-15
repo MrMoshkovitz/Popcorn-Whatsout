@@ -1,6 +1,8 @@
+import json
 import logging
 from ingestion.tmdb_api import tmdb_get
 from config import TMDB_LANGUAGE_PRIMARY
+from engine.genre_map import get_genre_names
 
 logger = logging.getLogger(__name__)
 
@@ -27,17 +29,20 @@ def _is_dismissed(conn, source_title_id: int, recommended_tmdb_id: int) -> bool:
 
 
 def _upsert_recommendation(conn, source_title_id, rec_tmdb_id, rec_type, rec_title,
-                           poster_path, vote_average):
+                           poster_path, vote_average, genres=None, collection_name=None,
+                           overview=None, backdrop_path=None, release_year=None):
     conn.execute(
         "INSERT OR REPLACE INTO recommendations "
         "(source_title_id, recommended_tmdb_id, recommended_type, recommended_title, "
-        " poster_path, tmdb_recommendation_score, status, created_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, "
+        " poster_path, tmdb_recommendation_score, collection_name, genres, "
+        " overview, backdrop_path, release_year, status, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "
         " COALESCE((SELECT status FROM recommendations "
         "   WHERE source_title_id = ? AND recommended_tmdb_id = ?), 'unseen'), "
         " CURRENT_TIMESTAMP)",
         (source_title_id, rec_tmdb_id, rec_type, rec_title,
-         poster_path, vote_average,
+         poster_path, vote_average, collection_name, genres,
+         overview, backdrop_path, release_year,
          source_title_id, rec_tmdb_id)
     )
 
@@ -51,6 +56,7 @@ def _add_collection_recs(conn, tmdb_id: int, source_title_id: int):
         return 0
 
     collection_id = collection["id"]
+    coll_name = collection.get("name")
     collection_data = tmdb_get(f"/collection/{collection_id}", {"language": TMDB_LANGUAGE_PRIMARY})
     if not collection_data:
         return 0
@@ -67,10 +73,17 @@ def _add_collection_recs(conn, tmdb_id: int, source_title_id: int):
             part_title = part.get("title", "")
         else:
             part_title = part.get("original_title") or part.get("title", "")
+        genre_ids = part.get("genre_ids", [])
+        genres_json = json.dumps(get_genre_names(genre_ids, "movie")) if genre_ids else None
+        rel_date = part.get("release_date") or ""
         _upsert_recommendation(
             conn, source_title_id, part["id"], "movie",
             part_title, part.get("poster_path"),
-            part.get("vote_average", 0)
+            part.get("vote_average", 0),
+            genres=genres_json, collection_name=coll_name,
+            overview=part.get("overview"),
+            backdrop_path=part.get("backdrop_path"),
+            release_year=rel_date[:4] if rel_date else None,
         )
         added += 1
     return added
@@ -98,9 +111,16 @@ def generate_recommendations(conn, tmdb_id: int, tmdb_type: str, source_title_id
             rec_title = result.get("title") or result.get("name", "")
         else:
             rec_title = result.get("original_title") or result.get("original_name") or result.get("title") or result.get("name", "")
+        genre_ids = result.get("genre_ids", [])
+        genres_json = json.dumps(get_genre_names(genre_ids, rec_type)) if genre_ids else None
+        rel_date = result.get("release_date") or result.get("first_air_date") or ""
         _upsert_recommendation(
             conn, source_title_id, rec_tmdb_id, rec_type, rec_title,
-            result.get("poster_path"), result.get("vote_average", 0)
+            result.get("poster_path"), result.get("vote_average", 0),
+            genres=genres_json,
+            overview=result.get("overview"),
+            backdrop_path=result.get("backdrop_path"),
+            release_year=rel_date[:4] if rel_date else None,
         )
         added += 1
 

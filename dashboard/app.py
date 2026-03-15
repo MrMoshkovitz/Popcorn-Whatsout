@@ -3,10 +3,12 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from flask import Flask, render_template, redirect, url_for, request, flash, jsonify
+import json
 import sqlite3
 import logging
 import tempfile
 import os as _os
+from collections import defaultdict
 from datetime import datetime, timedelta
 from config import DB_PATH
 from ingestion.csv_parser import parse_netflix_csv
@@ -88,39 +90,12 @@ def watch_next():
     conn = get_db()
     try:
         tag_sql, tag_params = tag_filter_sql('t')
-        recommendations = conn.execute("""
-            SELECT r.id, r.recommended_title, r.poster_path, r.recommended_tmdb_id,
-                   r.recommended_type, t.title_he, t.title_en, t.user_tag AS source_tag,
-                   CASE WHEN t.original_language = 'he' THEN COALESCE(t.title_he, t.title_en) ELSE COALESCE(t.title_en, t.title_he) END AS source_title
-            FROM recommendations r
-            JOIN titles t ON r.source_title_id = t.id
-            WHERE r.status = ?""" + tag_sql + """
-            ORDER BY r.created_at DESC
-        """, ('unseen',) + tag_params).fetchall()
 
-        # Attach streaming providers to each recommendation
-        recs_with_providers = []
-        for rec in recommendations:
-            providers = conn.execute("""
-                SELECT provider_name, provider_logo_path, monetization_type
-                FROM streaming_availability
-                WHERE tmdb_id = ? AND tmdb_type = ?
-            """, (rec['recommended_tmdb_id'], rec['recommended_type'])).fetchall()
-            recs_with_providers.append({
-                'id': rec['id'],
-                'recommended_title': rec['recommended_title'],
-                'recommended_type': rec['recommended_type'],
-                'poster_path': rec['poster_path'],
-                'source_title': rec['source_title'],
-                'source_tag': rec['source_tag'] or 'both',
-                'providers': providers,
-            })
-
-        # Season gaps: series where user hasn't finished all available seasons
-        # Only show if next season air_date is known AND already released
+        # Continue Watching — season gaps with enriched data
         continue_rows = conn.execute("""
             SELECT t.id, CASE WHEN t.original_language = 'he' THEN COALESCE(t.title_he, t.title_en) ELSE COALESCE(t.title_en, t.title_he) END AS title,
                    t.poster_path, t.tmdb_id, t.tmdb_type, t.user_tag,
+                   t.vote_average, t.overview, t.backdrop_path, t.release_year, t.genres,
                    st.max_watched_season, st.total_seasons_tmdb
             FROM series_tracking st
             JOIN titles t ON st.title_id = t.id
@@ -138,18 +113,121 @@ def watch_next():
                 WHERE tmdb_id = ? AND tmdb_type = ?
             """, (row['tmdb_id'], row['tmdb_type'])).fetchall()
             next_season = (row['max_watched_season'] or 0) + 1
+            genres = []
+            if row['genres']:
+                try:
+                    genres = json.loads(row['genres'])
+                except (json.JSONDecodeError, TypeError):
+                    pass
             continue_watching.append({
                 'title': row['title'],
                 'poster_path': row['poster_path'],
+                'tmdb_id': row['tmdb_id'],
+                'tmdb_type': row['tmdb_type'],
                 'next_season': next_season,
                 'total_seasons': row['total_seasons_tmdb'] or 0,
+                'max_watched_season': row['max_watched_season'] or 0,
                 'user_tag': row['user_tag'] or 'both',
                 'providers': providers,
+                'vote_average': row['vote_average'] or 0,
+                'overview': row['overview'] or '',
+                'backdrop_path': row['backdrop_path'] or '',
+                'release_year': row['release_year'] or '',
+                'genres': genres,
             })
 
+        # All unseen recommendations with genres + enriched data
+        recommendations = conn.execute("""
+            SELECT r.id, r.recommended_title, r.poster_path, r.recommended_tmdb_id,
+                   r.recommended_type, r.collection_name, r.genres,
+                   r.overview AS rec_overview, r.backdrop_path AS rec_backdrop,
+                   r.release_year AS rec_year, r.tmdb_recommendation_score AS vote_avg,
+                   t.user_tag AS source_tag,
+                   CASE WHEN t.original_language = 'he' THEN COALESCE(t.title_he, t.title_en) ELSE COALESCE(t.title_en, t.title_he) END AS source_title
+            FROM recommendations r
+            JOIN titles t ON r.source_title_id = t.id
+            WHERE r.status = ?""" + tag_sql + """
+            ORDER BY r.tmdb_recommendation_score DESC
+        """, ('unseen',) + tag_params).fetchall()
+
+        # Attach providers and parse genres
+        all_providers_set = set()
+        all_genres_set = set()
+        franchise_catchup = defaultdict(list)  # collection_name -> recs
+        movie_recs = []
+        tv_recs = []
+
+        for rec in recommendations:
+            providers = conn.execute("""
+                SELECT provider_name, provider_logo_path, monetization_type
+                FROM streaming_availability
+                WHERE tmdb_id = ? AND tmdb_type = ?
+            """, (rec['recommended_tmdb_id'], rec['recommended_type'])).fetchall()
+
+            provider_names = [p['provider_name'] for p in providers]
+            for pn in provider_names:
+                all_providers_set.add(pn)
+
+            genres = []
+            if rec['genres']:
+                try:
+                    genres = json.loads(rec['genres'])
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            for g in genres:
+                all_genres_set.add(g)
+
+            rec_dict = {
+                'id': rec['id'],
+                'recommended_title': rec['recommended_title'],
+                'recommended_type': rec['recommended_type'],
+                'recommended_tmdb_id': rec['recommended_tmdb_id'],
+                'poster_path': rec['poster_path'],
+                'source_title': rec['source_title'],
+                'source_tag': rec['source_tag'] or 'both',
+                'providers': providers,
+                'provider_names': provider_names,
+                'genres': genres,
+                'first_genre': genres[0] if genres else 'Other',
+                'collection_name': rec['collection_name'],
+                'overview': rec['rec_overview'] or '',
+                'backdrop_path': rec['rec_backdrop'] or '',
+                'release_year': rec['rec_year'] or '',
+                'vote_average': rec['vote_avg'] or 0,
+            }
+
+            if rec['collection_name']:
+                franchise_catchup[rec['collection_name']].append(rec_dict)
+            elif rec['recommended_type'] == 'movie':
+                movie_recs.append(rec_dict)
+            else:
+                tv_recs.append(rec_dict)
+
+        # Group by genre — each rec appears in its first genre only
+        def group_by_genre(recs, min_per_genre, max_genres):
+            genre_groups = defaultdict(list)
+            for r in recs:
+                genre_groups[r['first_genre']].append(r)
+            # Sort genres by count descending, filter by minimum
+            sorted_genres = sorted(genre_groups.items(), key=lambda x: -len(x[1]))
+            return [(g, items) for g, items in sorted_genres
+                    if len(items) >= min_per_genre][:max_genres]
+
+        movie_genre_rows = group_by_genre(movie_recs, 1, 8)
+        tv_genre_rows = group_by_genre(tv_recs, 1, 5)
+
+        # Hero items: top 3 recs with backdrop_path
+        all_recs = movie_recs + tv_recs
+        hero_items = [r for r in all_recs if r.get('backdrop_path')][:3]
+
         return render_template('watch_next.html',
-                               recommendations=recs_with_providers,
+                               hero_items=hero_items,
                                continue_watching=continue_watching,
+                               franchise_catchup=dict(franchise_catchup),
+                               movie_genre_rows=movie_genre_rows,
+                               tv_genre_rows=tv_genre_rows,
+                               all_providers=sorted(all_providers_set),
+                               all_genres=sorted(all_genres_set),
                                review_count=get_review_count())
     finally:
         conn.close()
@@ -160,41 +238,56 @@ def coming_soon():
     conn = get_db()
     try:
         tag_sql, tag_params = tag_filter_sql('t')
+        from datetime import date as date_cls
+
+        # TV: unwatched seasons with future/unknown air dates
         alerts_rows = conn.execute("""
             SELECT t.id, CASE WHEN t.original_language = 'he' THEN COALESCE(t.title_he, t.title_en) ELSE COALESCE(t.title_en, t.title_he) END AS title,
                    t.poster_path, t.tmdb_id, t.tmdb_type, t.user_tag,
+                   t.vote_average, t.overview, t.backdrop_path, t.release_year,
                    st.max_watched_season, st.total_seasons_tmdb,
-                   st.next_season_air_date
+                   st.next_season_air_date, st.returning_series
             FROM series_tracking st
             JOIN titles t ON st.title_id = t.id
-            WHERE st.status = ? AND st.total_seasons_tmdb > st.max_watched_season
-              AND (st.next_season_air_date IS NULL OR st.next_season_air_date > date('now'))""" + tag_sql + """
+            WHERE st.status = ? AND (
+                (st.total_seasons_tmdb > st.max_watched_season
+                 AND (st.next_season_air_date IS NULL OR st.next_season_air_date > date('now')))
+                OR (st.returning_series = 1
+                    AND st.total_seasons_tmdb <= st.max_watched_season)
+            )""" + tag_sql + """
             ORDER BY st.next_season_air_date ASC
         """, ('watching',) + tag_params).fetchall()
 
-        alerts = []
+        tv_alerts = []
         for row in alerts_rows:
             providers = conn.execute("""
                 SELECT provider_name, provider_logo_path, monetization_type
                 FROM streaming_availability
                 WHERE tmdb_id = ? AND tmdb_type = ?
             """, (row['tmdb_id'], row['tmdb_type'])).fetchall()
-            new_season = (row['max_watched_season'] or 0) + 1
-            # Format air date for display
+
+            is_returning = row['returning_series'] and (row['total_seasons_tmdb'] or 0) <= (row['max_watched_season'] or 0)
+
+            if is_returning:
+                new_season = (row['max_watched_season'] or 0) + 1
+            else:
+                new_season = (row['max_watched_season'] or 0) + 1
+
             air_date_display = None
+            days_until = None
             if row['next_season_air_date']:
                 try:
-                    from datetime import date as date_cls
                     ad = datetime.strptime(row['next_season_air_date'], '%Y-%m-%d')
                     air_date_display = ad.strftime('%b %d, %Y')
                     days_until = (ad.date() - date_cls.today()).days
                 except (ValueError, TypeError):
-                    days_until = None
-            else:
-                days_until = None
-            alerts.append({
+                    pass
+
+            tv_alerts.append({
                 'title': row['title'],
                 'poster_path': row['poster_path'],
+                'tmdb_id': row['tmdb_id'],
+                'tmdb_type': row['tmdb_type'],
                 'new_season': new_season,
                 'watched_season': row['max_watched_season'] or 0,
                 'total_seasons': row['total_seasons_tmdb'] or 0,
@@ -202,10 +295,77 @@ def coming_soon():
                 'providers': providers,
                 'air_date': air_date_display,
                 'days_until': days_until,
+                'is_returning': is_returning,
+                'vote_average': row['vote_average'] or 0,
+                'overview': row['overview'] or '',
+                'backdrop_path': row['backdrop_path'] or '',
+                'release_year': row['release_year'] or '',
             })
 
+        # Movie franchises — unreleased parts
+        franchise_alerts = conn.execute("""
+            SELECT collection_name, next_unreleased_title, next_unreleased_poster,
+                   next_release_date, watched_parts, total_parts
+            FROM franchise_tracking
+            WHERE next_unreleased_tmdb_id IS NOT NULL
+            ORDER BY next_release_date ASC
+        """).fetchall()
+
+        franchise_list = []
+        for row in franchise_alerts:
+            air_date_display = None
+            days_until = None
+            if row['next_release_date']:
+                try:
+                    ad = datetime.strptime(row['next_release_date'], '%Y-%m-%d')
+                    air_date_display = ad.strftime('%b %d, %Y')
+                    days_until = (ad.date() - date_cls.today()).days
+                except (ValueError, TypeError):
+                    pass
+            franchise_list.append({
+                'collection_name': row['collection_name'],
+                'title': row['next_unreleased_title'],
+                'poster_path': row['next_unreleased_poster'],
+                'watched_parts': row['watched_parts'],
+                'total_parts': row['total_parts'],
+                'air_date': air_date_display,
+                'days_until': days_until,
+            })
+
+        # Group all items by month for timeline view
+        from collections import OrderedDict
+        timeline = OrderedDict()
+        all_items = []
+        for a in tv_alerts:
+            a['item_type'] = 'tv'
+            all_items.append(a)
+        for a in franchise_list:
+            a['item_type'] = 'movie'
+            all_items.append(a)
+
+        # Sort by air_date (None/TBA last)
+        def sort_key(item):
+            if item.get('days_until') is not None:
+                return (0, item['days_until'])
+            return (1, 0)
+        all_items.sort(key=sort_key)
+
+        for item in all_items:
+            if item.get('air_date'):
+                try:
+                    month_key = datetime.strptime(item['air_date'], '%b %d, %Y').strftime('%B %Y')
+                except (ValueError, TypeError):
+                    month_key = 'TBA'
+            else:
+                month_key = 'TBA'
+            if month_key not in timeline:
+                timeline[month_key] = []
+            timeline[month_key].append(item)
+
         return render_template('coming_soon.html',
-                               alerts=alerts,
+                               tv_alerts=tv_alerts,
+                               franchise_alerts=franchise_list,
+                               timeline=timeline,
                                review_count=get_review_count())
     finally:
         conn.close()
@@ -218,7 +378,9 @@ def library():
         tag_sql, tag_params = tag_filter_sql('t')
         titles = conn.execute("""
             SELECT t.id, t.title_he, t.title_en, t.original_language, t.tmdb_type, t.poster_path,
-                   t.user_tag, COUNT(wh.id) AS watch_count,
+                   t.user_tag, t.vote_average, t.release_year, t.tmdb_id, t.genres,
+                   t.overview, t.backdrop_path,
+                   COUNT(wh.id) AS watch_count,
                    MAX(wh.watch_date) AS last_watched,
                    st.max_watched_season, st.total_seasons_tmdb, st.total_episodes_tmdb
             FROM titles t
@@ -229,8 +391,22 @@ def library():
             ORDER BY last_watched DESC
         """, tag_params).fetchall()
 
+        # Compute library stats
+        total_count = len(titles)
+        movie_count = sum(1 for t in titles if t['tmdb_type'] == 'movie')
+        tv_count = sum(1 for t in titles if t['tmdb_type'] == 'tv')
+        dates = [t['last_watched'] for t in titles if t['last_watched']]
+        earliest_year = min(dates)[:4] if dates else None
+        stats = {
+            'total': total_count,
+            'movies': movie_count,
+            'tv': tv_count,
+            'since': earliest_year,
+        }
+
         return render_template('library.html',
                                titles=titles,
+                               stats=stats,
                                review_count=get_review_count())
     finally:
         conn.close()
@@ -377,12 +553,24 @@ def add():
     details_en = tmdb_get(f'/{tmdb_type}/{tmdb_id}', {'language': 'en-US'})
 
     original_language = (details_en or details_he or {}).get('original_language')
+    # Extract genres from TMDB detail response
+    detail_data = details_he or details_en or {}
+    genres_list = [g['name'] for g in detail_data.get('genres', [])]
+    genres_json = json.dumps(genres_list) if genres_list else None
+    overview = detail_data.get('overview')
+    backdrop_path = detail_data.get('backdrop_path')
+    vote_average = detail_data.get('vote_average')
+    rel_date = detail_data.get('release_date') or detail_data.get('first_air_date') or ''
+    release_year = rel_date[:4] if rel_date else None
+
     conn = get_db()
     try:
         conn.execute("""
             INSERT OR REPLACE INTO titles
-            (tmdb_id, tmdb_type, title_he, title_en, poster_path, original_language, match_status, confidence, source, user_tag)
-            VALUES (?, ?, ?, ?, ?, ?, 'manual', 1.0, 'manual', ?)
+            (tmdb_id, tmdb_type, title_he, title_en, poster_path, original_language,
+             match_status, confidence, source, user_tag, genres,
+             overview, backdrop_path, vote_average, release_year)
+            VALUES (?, ?, ?, ?, ?, ?, 'manual', 1.0, 'manual', ?, ?, ?, ?, ?, ?)
         """, (
             tmdb_id, tmdb_type,
             (details_he or {}).get('title') or (details_he or {}).get('name'),
@@ -390,6 +578,8 @@ def add():
             (details_he or details_en or {}).get('poster_path'),
             original_language,
             user_tag,
+            genres_json,
+            overview, backdrop_path, vote_average, release_year,
         ))
 
         # Get the title_id for recommendation generation
@@ -472,7 +662,150 @@ def dismiss(rec_id):
         conn.commit()
     finally:
         conn.close()
+    if request.headers.get('Accept') == 'application/json':
+        return jsonify({'ok': True})
     return redirect(url_for('watch_next'))
+
+
+@app.route('/undismiss/<int:rec_id>', methods=['POST'])
+def undismiss(rec_id):
+    conn = get_db()
+    try:
+        conn.execute(
+            "UPDATE recommendations SET status = 'unseen' WHERE id = ?",
+            (rec_id,)
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    if request.headers.get('Accept') == 'application/json':
+        return jsonify({'ok': True})
+    return redirect(url_for('watch_next'))
+
+
+@app.route('/api/mark-watched/<int:rec_id>', methods=['POST'])
+def mark_watched(rec_id):
+    conn = get_db()
+    try:
+        conn.execute(
+            "UPDATE recommendations SET status = 'watched' WHERE id = ?",
+            (rec_id,)
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({'ok': True})
+
+
+@app.route('/api/tag/<int:title_id>', methods=['POST'])
+def change_tag(title_id):
+    new_tag = request.form.get('user_tag', '')
+    if new_tag not in ('me', 'wife', 'both'):
+        return jsonify({'ok': False, 'error': 'invalid tag'}), 400
+    conn = get_db()
+    try:
+        conn.execute(
+            "UPDATE titles SET user_tag = ? WHERE id = ?",
+            (new_tag, title_id)
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({'ok': True})
+
+
+@app.route('/api/detail/<tmdb_type>/<int:tmdb_id>')
+def api_detail(tmdb_type, tmdb_id):
+    if tmdb_type not in ('movie', 'tv'):
+        return jsonify({'error': 'invalid type'}), 400
+
+    result = {'cast': [], 'director': None, 'trailer_key': None, 'similar': []}
+
+    # Credits
+    credits = tmdb_get(f'/{tmdb_type}/{tmdb_id}/credits', {'language': 'en-US'})
+    if credits:
+        result['cast'] = [
+            {'name': c.get('name', ''), 'profile_path': c.get('profile_path')}
+            for c in credits.get('cast', [])[:8]
+        ]
+        for crew in credits.get('crew', []):
+            if crew.get('job') == 'Director':
+                result['director'] = crew.get('name')
+                break
+
+    # Videos (trailer)
+    videos = tmdb_get(f'/{tmdb_type}/{tmdb_id}/videos', {'language': 'en-US'})
+    if videos:
+        for v in videos.get('results', []):
+            if v.get('site') == 'YouTube' and v.get('type') in ('Trailer', 'Teaser'):
+                result['trailer_key'] = v.get('key')
+                break
+
+    # Similar
+    similar = tmdb_get(f'/{tmdb_type}/{tmdb_id}/similar', {'language': 'en-US'})
+    if similar:
+        result['similar'] = [
+            {
+                'id': s['id'],
+                'title': s.get('title') or s.get('name', ''),
+                'name': s.get('name') or s.get('title', ''),
+                'poster_path': s.get('poster_path'),
+                'backdrop_path': s.get('backdrop_path'),
+                'overview': (s.get('overview') or '')[:200],
+                'vote_average': s.get('vote_average', 0),
+                'media_type': s.get('media_type', tmdb_type),
+                'release_date': s.get('release_date', ''),
+                'first_air_date': s.get('first_air_date', ''),
+            }
+            for s in similar.get('results', [])[:6]
+            if s.get('poster_path')
+        ]
+
+    return jsonify(result)
+
+
+@app.route('/api/taste-profile')
+def api_taste_profile():
+    conn = get_db()
+    try:
+        # Genre distribution
+        rows = conn.execute("SELECT genres FROM titles WHERE genres IS NOT NULL").fetchall()
+        genre_counts = defaultdict(int)
+        for row in rows:
+            try:
+                for g in json.loads(row['genres']):
+                    genre_counts[g] += 1
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        # Type split
+        type_rows = conn.execute(
+            "SELECT tmdb_type, COUNT(*) as cnt FROM titles GROUP BY tmdb_type"
+        ).fetchall()
+        type_split = {r['tmdb_type']: r['cnt'] for r in type_rows}
+
+        # Average rating
+        avg_row = conn.execute(
+            "SELECT AVG(vote_average) as avg_rating FROM titles WHERE vote_average IS NOT NULL"
+        ).fetchone()
+        avg_rating = round(avg_row['avg_rating'], 1) if avg_row and avg_row['avg_rating'] else None
+
+        # Decade distribution
+        decade_rows = conn.execute(
+            "SELECT SUBSTR(release_year, 1, 3) || '0s' as decade, COUNT(*) as cnt "
+            "FROM titles WHERE release_year IS NOT NULL "
+            "GROUP BY decade ORDER BY decade"
+        ).fetchall()
+        decades = {r['decade']: r['cnt'] for r in decade_rows}
+
+        return jsonify({
+            'genres': dict(sorted(genre_counts.items(), key=lambda x: -x[1])),
+            'type_split': type_split,
+            'avg_rating': avg_rating,
+            'decades': decades,
+        })
+    finally:
+        conn.close()
 
 
 @app.route('/delete/<int:title_id>', methods=['POST'])
@@ -493,6 +826,21 @@ def delete_title(title_id):
         conn.execute("DELETE FROM recommendations WHERE source_title_id = ?", (title_id,))
         conn.execute("DELETE FROM streaming_availability WHERE tmdb_id = ? AND tmdb_type = ?",
                      (title['tmdb_id'], title['tmdb_type']))
+        # Clean up franchise_tracking — remove this title from source_title_ids
+        franchise_rows = conn.execute(
+            "SELECT id, source_title_ids, watched_parts FROM franchise_tracking"
+        ).fetchall()
+        for fr in franchise_rows:
+            ids = [x.strip() for x in (fr['source_title_ids'] or '').split(',') if x.strip()]
+            if str(title_id) in ids:
+                ids.remove(str(title_id))
+                if ids:
+                    conn.execute(
+                        "UPDATE franchise_tracking SET source_title_ids = ?, watched_parts = MAX(0, watched_parts - 1) WHERE id = ?",
+                        (','.join(ids), fr['id'])
+                    )
+                else:
+                    conn.execute("DELETE FROM franchise_tracking WHERE id = ?", (fr['id'],))
         conn.execute("DELETE FROM titles WHERE id = ?", (title_id,))
         conn.commit()
         flash(f'Deleted: {name}')
@@ -588,6 +936,7 @@ def delete_all():
         conn.execute("DELETE FROM series_tracking")
         conn.execute("DELETE FROM recommendations")
         conn.execute("DELETE FROM streaming_availability")
+        conn.execute("DELETE FROM franchise_tracking")
         conn.execute("DELETE FROM titles")
         conn.execute("DELETE FROM settings WHERE key = ?", ('last_upload_date',))
         conn.commit()

@@ -4,101 +4,332 @@
 {% block title %}Watch Next{% endblock %}
 
 {% block content %}
+{# ── Hero Banner (Phase 2) ──────────────────────── #}
+{% if hero_items %}
+<div class="hero-banner">
+    {% for item in hero_items %}
+    <div class="hero-slide{% if loop.first %} active{% endif %}" data-slide="{{ loop.index0 }}">
+        <img class="hero-backdrop" src="https://image.tmdb.org/t/p/w1280{{ item.backdrop_path }}"
+             alt="{{ item.recommended_title }}" loading="{% if loop.first %}eager{% else %}lazy{% endif %}">
+        <div class="hero-gradient"></div>
+        <div class="hero-content">
+            <h2 dir="auto">{{ item.recommended_title }}</h2>
+            {% if item.overview %}
+            <p class="hero-overview" dir="auto">{{ item.overview }}</p>
+            {% endif %}
+            <div class="hero-meta">
+                {% if item.vote_average %}
+                <span class="hero-rating">{{ "%.1f"|format(item.vote_average) }}</span>
+                {% endif %}
+                {% if item.release_year %}
+                <span class="hero-year" dir="auto">{{ item.release_year }}</span>
+                {% endif %}
+                <span class="hero-type-badge badge-{{ item.recommended_type }}">{{ item.recommended_type }}</span>
+                {% for genre in item.genres[:3] %}
+                <span class="genre-pill" dir="auto">{{ genre }}</span>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    {% if hero_items|length > 1 %}
+    <div class="hero-dots">
+        {% for item in hero_items %}
+        <button class="hero-dot{% if loop.first %} active{% endif %}" data-slide="{{ loop.index0 }}"></button>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% else %}
 <div class="hero">
     <h1 dir="auto">What to Watch Tonight</h1>
     <p dir="auto">Personalized picks from your viewing history</p>
 </div>
-
-{% if continue_watching %}
-<h2 class="section-title" dir="auto">Continue Watching</h2>
-<div class="scroll-row" id="cw-row">
-    {% for item in continue_watching %}
-    <div class="poster-card" data-title="{{ item.title }}" data-tag="{{ item.user_tag }}">
-        {% if item.poster_path %}
-        <img class="poster-img" src="https://image.tmdb.org/t/p/w300{{ item.poster_path }}"
-             alt="{{ item.title }}" dir="auto">
-        {% else %}
-        <div class="poster-placeholder">&#127916;</div>
-        {% endif %}
-        <div class="season-overlay" dir="auto">Season {{ item.next_season }} available</div>
-        {% if item.providers %}
-        <div class="card-info">
-            <div class="provider-row">
-                {% for provider in item.providers %}
-                {% if provider.provider_logo_path %}
-                <img src="https://image.tmdb.org/t/p/original{{ provider.provider_logo_path }}"
-                     alt="{{ provider.provider_name }}" dir="auto"
-                     title="{{ provider.provider_name }} ({{ provider.monetization_type }})">
-                {% endif %}
-                {% endfor %}
-            </div>
-        </div>
-        {% endif %}
-        <div class="card-info">
-            <p class="card-title" dir="auto">{{ item.title }}</p>
-            {% if item.total_seasons > item.next_season %}
-            <p class="card-sub" dir="auto">{{ item.total_seasons }} seasons total</p>
-            {% endif %}
-        </div>
-    </div>
-    {% endfor %}
-</div>
 {% endif %}
 
-{% if recommendations %}
-<h2 class="section-title" dir="auto">Recommended For You</h2>
+{% set has_recs = continue_watching or franchise_catchup or movie_genre_rows or tv_genre_rows %}
+
+{% if has_recs %}
 <div class="filter-bar" dir="auto">
-    <input type="text" class="filter-search" id="rec-search" placeholder="Search recommendations..." dir="auto">
-    <div class="filter-pills" id="rec-type-filter">
+    <input type="text" class="filter-search" id="wn-search" placeholder="Search recommendations..." dir="auto">
+    <div class="filter-pills" id="wn-type-filter">
         <button class="filter-pill active" data-filter="all">All</button>
+        <button class="filter-pill" data-filter="movie">Movies</button>
         <button class="filter-pill" data-filter="tv">TV</button>
-        <button class="filter-pill" data-filter="movie">Movie</button>
     </div>
-    <div class="filter-pills" id="rec-tag-filter">
+    <div class="filter-pills" id="wn-tag-filter">
         <button class="filter-pill active" data-filter="all">All</button>
         <button class="filter-pill" data-filter="me">Me</button>
         <button class="filter-pill" data-filter="wife">Wife</button>
     </div>
+    {% if all_genres %}
+    <div class="filter-pills genre-pills" id="wn-genre-filter">
+        <button class="filter-pill active" data-filter="all">All Genres</button>
+        {% for genre in all_genres %}
+        <button class="filter-pill" data-filter="{{ genre }}">{{ genre }}</button>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% if all_providers %}
+    <div class="filter-pills provider-pills" id="wn-provider-filter">
+        <button class="filter-pill active" data-filter="all">All Providers</button>
+        {% for provider in all_providers %}
+        <button class="filter-pill" data-filter="{{ provider }}">{{ provider }}</button>
+        {% endfor %}
+    </div>
+    {% endif %}
+    <select class="filter-sort" id="wn-sort">
+        <option value="relevance">Relevance</option>
+        <option value="title">Title A-Z</option>
+    </select>
 </div>
-<div class="poster-grid" id="rec-grid">
-    {% for rec in recommendations %}
-    <div class="poster-card"
-         data-title="{{ rec.recommended_title }}"
-         data-source="{{ rec.source_title }}"
-         data-type="{{ rec.recommended_type }}"
-         data-tag="{{ rec.source_tag }}">
-        {% if rec.poster_path %}
-        <img class="poster-img" src="https://image.tmdb.org/t/p/w300{{ rec.poster_path }}"
-             alt="{{ rec.recommended_title }}" dir="auto">
-        {% else %}
-        <div class="poster-placeholder">&#127916;</div>
-        {% endif %}
-        <div class="hover-overlay">
-            <form method="post" action="/dismiss/{{ rec.id }}">
-                <button type="submit" class="btn-sm btn-dismiss">Dismiss</button>
-            </form>
-        </div>
-        <div class="card-info">
-            <p class="card-title" dir="auto">{{ rec.recommended_title }}</p>
-            <p class="card-sub" dir="auto">Based on {{ rec.source_title }}</p>
-            {% if rec.providers %}
-            <div class="provider-row">
-                {% for provider in rec.providers %}
+{% endif %}
+
+{# ── Continue Watching ───────────────────────────── #}
+{% if continue_watching %}
+<div class="genre-section" data-section-type="tv" data-genre="continue">
+    <h2 class="section-title" dir="auto">Continue Watching</h2>
+    <div class="scroll-row">
+        {% for item in continue_watching %}
+        <div class="poster-card fade-in-up"
+             data-title="{{ item.title }}" data-tag="{{ item.user_tag }}"
+             data-type="tv" data-genre="continue"
+             data-providers="{{ item.providers | map(attribute='provider_name') | join(',') }}"
+             data-tmdb-id="{{ item.tmdb_id }}" data-tmdb-type="tv"
+             data-overview="{{ item.overview }}" data-backdrop-path="{{ item.backdrop_path }}"
+             data-vote-average="{{ item.vote_average }}" data-release-year="{{ item.release_year }}"
+             data-stagger="{{ loop.index0 * 50 }}"
+             onclick="Popcorn.openModal('tv', {{ item.tmdb_id }}, {title:'{{ item.title|e }}',poster_path:'{{ item.poster_path }}',backdrop_path:'{{ item.backdrop_path }}',overview:this.getAttribute('data-overview'),vote_average:{{ item.vote_average or 0 }},release_year:'{{ item.release_year }}',total_seasons:{{ item.total_seasons }},watched_seasons:{{ item.max_watched_season }}})">
+            {% if item.poster_path %}
+            <img class="poster-img" src="https://image.tmdb.org/t/p/w300{{ item.poster_path }}"
+                 alt="{{ item.title }}" dir="auto" loading="lazy">
+            {% else %}
+            <div class="poster-placeholder">&#127916;</div>
+            {% endif %}
+            {% if item.vote_average %}
+            <span class="card-rating">{{ "%.1f"|format(item.vote_average) }}</span>
+            {% endif %}
+            <span class="poster-badge badge-tv">tv</span>
+            <div class="season-overlay" dir="auto">Season {{ item.next_season }} available</div>
+            {% if item.providers %}
+            <div class="card-providers-overlay">
+                {% for provider in item.providers %}
                 {% if provider.provider_logo_path %}
                 <img src="https://image.tmdb.org/t/p/original{{ provider.provider_logo_path }}"
                      alt="{{ provider.provider_name }}" dir="auto"
-                     title="{{ provider.provider_name }} ({{ provider.monetization_type }})">
+                     title="{{ provider.provider_name }} ({{ provider.monetization_type }})" loading="lazy">
                 {% endif %}
                 {% endfor %}
             </div>
             {% endif %}
+            <div class="hover-overlay">
+                {% if item.overview %}
+                <p class="hover-desc" dir="auto">{{ item.overview[:120] }}{% if item.overview|length > 120 %}...{% endif %}</p>
+                {% endif %}
+            </div>
+            <div class="card-info">
+                <p class="card-title" dir="auto">{{ item.title }}</p>
+                <p class="card-sub" dir="auto">
+                    S{{ item.max_watched_season }}/{{ item.total_seasons }} seasons
+                </p>
+                {% if item.release_year or item.genres %}
+                <p class="card-year-genre" dir="auto">{{ item.release_year }}{% if item.release_year and item.genres %} · {% endif %}{{ item.genres[0] if item.genres else '' }}</p>
+                {% endif %}
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: {{ (item.max_watched_season / item.total_seasons * 100)|int if item.total_seasons else 0 }}%"></div>
+                </div>
+            </div>
         </div>
+        {% endfor %}
     </div>
-    {% endfor %}
 </div>
 {% endif %}
 
-{% if not recommendations and not continue_watching %}
+{# ── Franchise Catch-up ──────────────────────────── #}
+{% if franchise_catchup %}
+{% for collection_name, recs in franchise_catchup.items() %}
+<div class="genre-section" data-section-type="movie" data-genre="franchise">
+    <h2 class="section-title" dir="auto">{{ collection_name }}</h2>
+    <div class="scroll-row">
+        {% for rec in recs %}
+        <div class="poster-card fade-in-up"
+             data-title="{{ rec.recommended_title }}"
+             data-source="{{ rec.source_title }}"
+             data-type="{{ rec.recommended_type }}"
+             data-tag="{{ rec.source_tag }}"
+             data-genre="franchise"
+             data-providers="{{ rec.provider_names | join(',') }}"
+             data-tmdb-id="{{ rec.recommended_tmdb_id }}" data-tmdb-type="{{ rec.recommended_type }}"
+             data-overview="{{ rec.overview }}" data-backdrop-path="{{ rec.backdrop_path }}"
+             data-vote-average="{{ rec.vote_average }}" data-release-year="{{ rec.release_year }}"
+             data-stagger="{{ loop.index0 * 50 }}"
+             onclick="Popcorn.openModal('{{ rec.recommended_type }}', {{ rec.recommended_tmdb_id }}, {title:'{{ rec.recommended_title|e }}',poster_path:'{{ rec.poster_path }}',backdrop_path:'{{ rec.backdrop_path }}',overview:this.getAttribute('data-overview'),vote_average:{{ rec.vote_average or 0 }},release_year:'{{ rec.release_year }}'})">
+            {% if rec.poster_path %}
+            <img class="poster-img" src="https://image.tmdb.org/t/p/w300{{ rec.poster_path }}"
+                 alt="{{ rec.recommended_title }}" dir="auto" loading="lazy">
+            {% else %}
+            <div class="poster-placeholder">&#127916;</div>
+            {% endif %}
+            {% if rec.vote_average %}
+            <span class="card-rating">{{ "%.1f"|format(rec.vote_average) }}</span>
+            {% endif %}
+            <span class="poster-badge badge-{{ rec.recommended_type }}">{{ rec.recommended_type }}</span>
+            {% if rec.providers %}
+            <div class="card-providers-overlay">
+                {% for provider in rec.providers %}
+                {% if provider.provider_logo_path %}
+                <img src="https://image.tmdb.org/t/p/original{{ provider.provider_logo_path }}"
+                     alt="{{ provider.provider_name }}" dir="auto" loading="lazy">
+                {% endif %}
+                {% endfor %}
+            </div>
+            {% endif %}
+            <div class="hover-overlay">
+                {% if rec.overview %}
+                <p class="hover-desc" dir="auto">{{ rec.overview[:120] }}{% if rec.overview|length > 120 %}...{% endif %}</p>
+                {% endif %}
+                <button type="button" class="btn-sm btn-dismiss"
+                        onclick="event.stopPropagation(); Popcorn.dismiss({{ rec.id }}, this.closest('.poster-card'))">Dismiss</button>
+            </div>
+            <div class="card-info">
+                <p class="card-title" dir="auto">{{ rec.recommended_title }}</p>
+                <p class="card-sub collection-label" dir="auto">{{ rec.collection_name }}</p>
+                {% if rec.release_year %}
+                <p class="card-year-genre" dir="auto">{{ rec.release_year }}{% if rec.genres %} · {{ rec.genres[0] }}{% endif %}</p>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endfor %}
+{% endif %}
+
+{# ── Movie Recommendations by Genre ──────────────── #}
+{% if movie_genre_rows %}
+{% for genre, recs in movie_genre_rows %}
+<div class="genre-section" data-section-type="movie" data-genre="{{ genre }}">
+    <h2 class="section-title" dir="auto">{{ genre }} Movies For You</h2>
+    <div class="scroll-row">
+        {% for rec in recs %}
+        <div class="poster-card fade-in-up"
+             data-title="{{ rec.recommended_title }}"
+             data-source="{{ rec.source_title }}"
+             data-type="movie"
+             data-tag="{{ rec.source_tag }}"
+             data-genre="{{ genre }}"
+             data-providers="{{ rec.provider_names | join(',') }}"
+             data-tmdb-id="{{ rec.recommended_tmdb_id }}" data-tmdb-type="movie"
+             data-overview="{{ rec.overview }}" data-backdrop-path="{{ rec.backdrop_path }}"
+             data-vote-average="{{ rec.vote_average }}" data-release-year="{{ rec.release_year }}"
+             data-stagger="{{ loop.index0 * 50 }}"
+             onclick="Popcorn.openModal('movie', {{ rec.recommended_tmdb_id }}, {title:'{{ rec.recommended_title|e }}',poster_path:'{{ rec.poster_path }}',backdrop_path:'{{ rec.backdrop_path }}',overview:this.getAttribute('data-overview'),vote_average:{{ rec.vote_average or 0 }},release_year:'{{ rec.release_year }}'})">
+            {% if rec.poster_path %}
+            <img class="poster-img" src="https://image.tmdb.org/t/p/w300{{ rec.poster_path }}"
+                 alt="{{ rec.recommended_title }}" dir="auto" loading="lazy">
+            {% else %}
+            <div class="poster-placeholder">&#127916;</div>
+            {% endif %}
+            {% if rec.vote_average %}
+            <span class="card-rating">{{ "%.1f"|format(rec.vote_average) }}</span>
+            {% endif %}
+            <span class="poster-badge badge-movie">movie</span>
+            {% if rec.providers %}
+            <div class="card-providers-overlay">
+                {% for provider in rec.providers %}
+                {% if provider.provider_logo_path %}
+                <img src="https://image.tmdb.org/t/p/original{{ provider.provider_logo_path }}"
+                     alt="{{ provider.provider_name }}" dir="auto" loading="lazy">
+                {% endif %}
+                {% endfor %}
+            </div>
+            {% endif %}
+            <div class="hover-overlay">
+                {% if rec.overview %}
+                <p class="hover-desc" dir="auto">{{ rec.overview[:120] }}{% if rec.overview|length > 120 %}...{% endif %}</p>
+                {% endif %}
+                <button type="button" class="btn-sm btn-dismiss"
+                        onclick="event.stopPropagation(); Popcorn.dismiss({{ rec.id }}, this.closest('.poster-card'))">Dismiss</button>
+                <button type="button" class="btn-sm btn-watched"
+                        onclick="event.stopPropagation(); Popcorn.markWatched({{ rec.id }}, this.closest('.poster-card'))">Watched</button>
+            </div>
+            <div class="card-info">
+                <p class="card-title" dir="auto">{{ rec.recommended_title }}</p>
+                <p class="card-sub" dir="auto">Based on {{ rec.source_title }}</p>
+                {% if rec.release_year or rec.genres %}
+                <p class="card-year-genre" dir="auto">{{ rec.release_year }}{% if rec.release_year and rec.genres %} · {% endif %}{{ rec.genres[0] if rec.genres else '' }}</p>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endfor %}
+{% endif %}
+
+{# ── TV Recommendations by Genre ─────────────────── #}
+{% if tv_genre_rows %}
+{% for genre, recs in tv_genre_rows %}
+<div class="genre-section" data-section-type="tv" data-genre="{{ genre }}">
+    <h2 class="section-title" dir="auto">{{ genre }} Series For You</h2>
+    <div class="scroll-row">
+        {% for rec in recs %}
+        <div class="poster-card fade-in-up"
+             data-title="{{ rec.recommended_title }}"
+             data-source="{{ rec.source_title }}"
+             data-type="tv"
+             data-tag="{{ rec.source_tag }}"
+             data-genre="{{ genre }}"
+             data-providers="{{ rec.provider_names | join(',') }}"
+             data-tmdb-id="{{ rec.recommended_tmdb_id }}" data-tmdb-type="tv"
+             data-overview="{{ rec.overview }}" data-backdrop-path="{{ rec.backdrop_path }}"
+             data-vote-average="{{ rec.vote_average }}" data-release-year="{{ rec.release_year }}"
+             data-stagger="{{ loop.index0 * 50 }}"
+             onclick="Popcorn.openModal('tv', {{ rec.recommended_tmdb_id }}, {title:'{{ rec.recommended_title|e }}',poster_path:'{{ rec.poster_path }}',backdrop_path:'{{ rec.backdrop_path }}',overview:this.getAttribute('data-overview'),vote_average:{{ rec.vote_average or 0 }},release_year:'{{ rec.release_year }}'})">
+            {% if rec.poster_path %}
+            <img class="poster-img" src="https://image.tmdb.org/t/p/w300{{ rec.poster_path }}"
+                 alt="{{ rec.recommended_title }}" dir="auto" loading="lazy">
+            {% else %}
+            <div class="poster-placeholder">&#127916;</div>
+            {% endif %}
+            {% if rec.vote_average %}
+            <span class="card-rating">{{ "%.1f"|format(rec.vote_average) }}</span>
+            {% endif %}
+            <span class="poster-badge badge-tv">tv</span>
+            {% if rec.providers %}
+            <div class="card-providers-overlay">
+                {% for provider in rec.providers %}
+                {% if provider.provider_logo_path %}
+                <img src="https://image.tmdb.org/t/p/original{{ provider.provider_logo_path }}"
+                     alt="{{ provider.provider_name }}" dir="auto" loading="lazy">
+                {% endif %}
+                {% endfor %}
+            </div>
+            {% endif %}
+            <div class="hover-overlay">
+                {% if rec.overview %}
+                <p class="hover-desc" dir="auto">{{ rec.overview[:120] }}{% if rec.overview|length > 120 %}...{% endif %}</p>
+                {% endif %}
+                <button type="button" class="btn-sm btn-dismiss"
+                        onclick="event.stopPropagation(); Popcorn.dismiss({{ rec.id }}, this.closest('.poster-card'))">Dismiss</button>
+                <button type="button" class="btn-sm btn-watched"
+                        onclick="event.stopPropagation(); Popcorn.markWatched({{ rec.id }}, this.closest('.poster-card'))">Watched</button>
+            </div>
+            <div class="card-info">
+                <p class="card-title" dir="auto">{{ rec.recommended_title }}</p>
+                <p class="card-sub" dir="auto">Based on {{ rec.source_title }}</p>
+                {% if rec.release_year or rec.genres %}
+                <p class="card-year-genre" dir="auto">{{ rec.release_year }}{% if rec.release_year and rec.genres %} · {% endif %}{{ rec.genres[0] if rec.genres else '' }}</p>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endfor %}
+{% endif %}
+
+{% if not has_recs %}
 <div class="empty-state">
     <div class="icon">&#127871;</div>
     <p dir="auto">No recommendations yet.<br>Upload your Netflix history to get started!</p>
@@ -109,30 +340,97 @@
 {% block scripts %}
 <script>
 (function() {
-    var grid = document.getElementById('rec-grid');
-    var searchInput = document.getElementById('rec-search');
-    var typeFilter = document.getElementById('rec-type-filter');
-    var tagFilter = document.getElementById('rec-tag-filter');
-    if (!grid) return;
+    /* ── Hero banner rotation ──────────────────── */
+    var slides = document.querySelectorAll('.hero-slide');
+    var dots = document.querySelectorAll('.hero-dot');
+    if (slides.length > 1) {
+        var current = 0;
+        var interval = setInterval(function() {
+            slides[current].classList.remove('active');
+            dots[current].classList.remove('active');
+            current = (current + 1) % slides.length;
+            slides[current].classList.add('active');
+            dots[current].classList.add('active');
+        }, 8000);
+
+        dots.forEach(function(dot) {
+            dot.addEventListener('click', function() {
+                clearInterval(interval);
+                slides[current].classList.remove('active');
+                dots[current].classList.remove('active');
+                current = parseInt(dot.getAttribute('data-slide'));
+                slides[current].classList.add('active');
+                dots[current].classList.add('active');
+            });
+        });
+    }
+
+    /* ── Filter/search/sort ────────────────────── */
+    var searchInput = document.getElementById('wn-search');
+    var typeFilter = document.getElementById('wn-type-filter');
+    var tagFilter = document.getElementById('wn-tag-filter');
+    var genreFilter = document.getElementById('wn-genre-filter');
+    var providerFilter = document.getElementById('wn-provider-filter');
+    var sortSelect = document.getElementById('wn-sort');
+    var sections = document.querySelectorAll('.genre-section');
+    if (!sections.length) return;
 
     var activeType = 'all';
     var activeTag = 'all';
+    var activeGenre = 'all';
+    var activeProvider = 'all';
 
     function applyFilters() {
         var query = (searchInput ? searchInput.value : '').toLowerCase();
-        grid.querySelectorAll('.poster-card').forEach(function(card) {
-            var title = (card.getAttribute('data-title') || '').toLowerCase();
-            var source = (card.getAttribute('data-source') || '').toLowerCase();
-            var type = card.getAttribute('data-type') || '';
-            var tag = card.getAttribute('data-tag') || 'both';
-            var matchSearch = !query || title.indexOf(query) !== -1 || source.indexOf(query) !== -1;
-            var matchType = activeType === 'all' || type === activeType;
-            var matchTag = activeTag === 'all' || tag === activeTag || tag === 'both';
-            card.style.display = (matchSearch && matchType && matchTag) ? '' : 'none';
+
+        sections.forEach(function(section) {
+            var sectionType = section.getAttribute('data-section-type');
+            var sectionGenre = section.getAttribute('data-genre');
+
+            var typeMatch = activeType === 'all' || sectionType === activeType;
+            var genreMatch = activeGenre === 'all' || sectionGenre === activeGenre
+                || sectionGenre === 'continue' || sectionGenre === 'franchise';
+
+            section.style.display = (typeMatch && genreMatch) ? '' : 'none';
+            if (!typeMatch || !genreMatch) return;
+
+            var cards = section.querySelectorAll('.poster-card');
+            var anyVisible = false;
+            cards.forEach(function(card) {
+                var title = (card.getAttribute('data-title') || '').toLowerCase();
+                var source = (card.getAttribute('data-source') || '').toLowerCase();
+                var providers = (card.getAttribute('data-providers') || '').toLowerCase();
+                var tag = card.getAttribute('data-tag') || 'both';
+
+                var matchSearch = !query || title.indexOf(query) !== -1 || source.indexOf(query) !== -1;
+                var matchProvider = activeProvider === 'all' || providers.indexOf(activeProvider.toLowerCase()) !== -1;
+                var matchTagFilter = activeTag === 'all' || tag === activeTag || tag === 'both';
+                var visible = matchSearch && matchProvider && matchTagFilter;
+                card.style.display = visible ? '' : 'none';
+                if (visible) anyVisible = true;
+            });
+            if (!anyVisible) section.style.display = 'none';
+        });
+    }
+
+    function sortCards() {
+        var sortBy = sortSelect ? sortSelect.value : 'relevance';
+        if (sortBy === 'relevance') return;
+        sections.forEach(function(section) {
+            var row = section.querySelector('.scroll-row');
+            if (!row) return;
+            var cards = Array.from(row.querySelectorAll('.poster-card'));
+            cards.sort(function(a, b) {
+                var ta = (a.getAttribute('data-title') || '').toLowerCase();
+                var tb = (b.getAttribute('data-title') || '').toLowerCase();
+                return ta.localeCompare(tb);
+            });
+            cards.forEach(function(card) { row.appendChild(card); });
         });
     }
 
     if (searchInput) searchInput.addEventListener('input', applyFilters);
+    if (sortSelect) sortSelect.addEventListener('change', function() { sortCards(); applyFilters(); });
 
     function setupPills(container, callback) {
         if (!container) return;
@@ -148,6 +446,8 @@
 
     setupPills(typeFilter, function(v) { activeType = v; });
     setupPills(tagFilter, function(v) { activeTag = v; });
+    setupPills(genreFilter, function(v) { activeGenre = v; });
+    setupPills(providerFilter, function(v) { activeProvider = v; });
 })();
 </script>
 {% endblock %}
